@@ -6,6 +6,10 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": ["**/*"],
+    "splash": {
+      "backgroundColor": "#ffffff",
+      "resizeMode": "contain"
+    },
     "android": {
       "package": "com.tsestockapp.app",
       "versionCode": 1
