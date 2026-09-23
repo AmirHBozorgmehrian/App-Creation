@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "TSE Stock App",
+    "slug": "tse-stock-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "splash": {
+      "backgroundColor": "#ffffff",
+      "resizeMode": "contain"
+    },
+    "android": {
+      "package": "com.tsestockapp.app",
+      "versionCode": 1
+    }
+  }
+}
