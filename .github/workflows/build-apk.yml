@@ -1,0 +1,52 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Install JS dependencies
+        run: npm install
+
+      - name: Align native dependency versions with Expo SDK
+        run: npx expo install --fix
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --clean
+
+      - name: Increase Gradle memory
+        run: |
+          echo "org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
+          echo "org.gradle.daemon=false" >> android/gradle.properties
+          echo "org.gradle.parallel=false" >> android/gradle.properties
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tse-stock-app-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
