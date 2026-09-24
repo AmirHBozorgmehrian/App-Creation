@@ -18,7 +18,7 @@ export async function loadStocksCache(): Promise<CachePayload | null> {
   }
 }
 
-export async function saveStocksCache(data: Stock[]): Promise<void> {
-  const payload: CachePayload = { data, updatedAt: Date.now() };
+export async function saveStocksCache(data: Stock[], updatedAt: number = Date.now()): Promise<void> {
+  const payload: CachePayload = { data, updatedAt };
   await AsyncStorage.setItem(KEY, JSON.stringify(payload));
 }

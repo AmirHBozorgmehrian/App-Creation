@@ -5,6 +5,74 @@ market (Tehran Stock Exchange + Fara Bourse, via TSETMC) with a search bar.
 Tapping a stock adds/removes it from a local "Followings" list. No trading —
 just browsing and bookmarking, for now.
 
+## Automatic price monitoring (no phone/laptop needed)
+
+`.github/workflows/monitor.yml` runs on a schedule - every 10 minutes during
+Tehran Stock Exchange trading hours (Sat-Wed, 9:00-12:30 Iran time), fully
+inside GitHub, whether or not your own devices are on. It runs
+`scripts/monitor.mjs`, which fetches TSETMC and commits the result to
+`data/latest.json`. The app reads that file straight from
+`raw.githubusercontent.com` instead of calling TSETMC itself, so it loads
+faster and doesn't depend on your phone's connection to do the fetching.
+
+**This requires the repo to be public** (Settings → General → Danger Zone →
+Change visibility), since `raw.githubusercontent.com` only serves files from
+public repos without authentication. The code and price data aren't
+sensitive, so this should be fine - just don't put anything private in this
+repo later.
+
+If you ever rename the repo or your GitHub username changes, update the
+`SNAPSHOT_URL` constant in `src/api/snapshot.ts` to match.
+
+## Syncing Followings between two phones
+
+Both phones read/write the same `data/followings.json` file in this repo
+via GitHub's API. To enable writing (reading works without this):
+
+1. On GitHub: **Settings → Developer settings → Personal access tokens →
+   Fine-grained tokens → Generate new token**.
+2. Set **Repository access** to "Only select repositories" → this repo only.
+3. Under **Permissions → Repository permissions**, set **Contents** to
+   **Read and write**. Leave everything else as "No access".
+4. Generate it, copy the token (starts with `github_pat_...`) - GitHub only
+   shows it once.
+5. In the app, tap the ⚙ next to the title, paste the token, Save.
+6. Do this on **both** phones, using the same token or one each - either
+   works, since it's just used to write to the same file.
+
+Now, following/unfollowing a stock on one phone pushes to GitHub
+immediately, and the other phone picks it up the next time it's opened.
+
+## Emergency push alerts (followed stock drops 1%+ in a day)
+
+This part needs a one-time Firebase setup, since sending a push notification
+to a specific phone - even while it's idle - requires Google's push
+infrastructure (Firebase Cloud Messaging, free, no credit card needed).
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com),
+   **Add project** (any name, Analytics can be skipped).
+2. Inside the project, click **Add app → Android**. For the package name,
+   enter exactly: `com.tsestockapp.app`
+3. Download the generated **`google-services.json`** and place it at the
+   **root of this project** (next to `app.json`) - then commit and push it.
+4. Back in the Firebase console: **Project settings (gear icon) → Service
+   accounts → Generate new private key**. This downloads a second JSON file
+   - keep this one secret, don't commit it to the repo.
+5. On GitHub: **repo → Settings → Secrets and variables → Actions → New
+   repository secret**. Name it `FIREBASE_SERVICE_ACCOUNT_JSON`, and paste
+   the *entire contents* of that service-account file as the value.
+6. Push the code changes (including `google-services.json`) and let the
+   "Build APK" workflow run - the new release APK will include push support.
+7. Install the new APK on both phones and open the app once on each - this
+   registers each phone's push token to `data/push-tokens.json`
+   automatically (as long as a GitHub token is set in Settings on that
+   phone, per the sync section above).
+
+Once all of that is in place: every 10-minute check also looks at your
+followed stocks, and if any has dropped 1% or more since yesterday's close,
+both phones get a push notification - once per stock per day, so it won't
+spam you every 10 minutes once triggered.
+
 ## Data source & legality
 
 The app reads from `cdn.tsetmc.com`, the same endpoint tsetmc.com's own
