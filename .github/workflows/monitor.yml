@@ -1,0 +1,47 @@
+name: Monitor Stock Prices
+
+# Tehran Stock Exchange trades Sat-Wed, 9:00-12:30 Iran time (UTC+3:30),
+# which is 05:30-09:00 UTC. These three cron lines together fire every
+# 10 minutes across that exact window, only on trading days (0=Sun,
+# 1=Mon, 2=Tue, 3=Wed, 6=Sat - Thu/Fri are skipped).
+# Note: GitHub may delay scheduled runs by a few minutes under load, and
+# this doesn't know about one-off Iranian market holidays (Nowruz, etc.) -
+# on those days it'll just keep re-saving the same closing snapshot.
+on:
+  schedule:
+    - cron: "30,40,50 5 * * 0,1,2,3,6"
+    - cron: "0,10,20,30,40,50 6-8 * * 0,1,2,3,6"
+    - cron: "0 9 * * 0,1,2,3,6"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Fetch latest TSETMC snapshot and check alerts
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/monitor.mjs
+
+      - name: Commit snapshot
+        run: |
+          git config user.name "tse-monitor-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/latest.json data/alert-state.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update stock snapshot"
+            git push
+          fi
