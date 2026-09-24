@@ -19,7 +19,6 @@ import { normalizeFarsi } from "../utils/normalizeFarsi";
 import { colors } from "../theme";
 import { pullFollowings, pushFollowings } from "../sync/followingsSync";
 import { getGithubToken, setGithubToken } from "../storage/githubToken";
-import { registerForPushAlerts } from "../push/registerPush";
 
 type Tab = "all" | "followings";
 
@@ -99,7 +98,6 @@ export default function StockListScreen() {
 
   useEffect(() => {
     init();
-    registerForPushAlerts();
   }, [init]);
 
   const onRefresh = () => {

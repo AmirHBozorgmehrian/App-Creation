@@ -3,7 +3,7 @@
 // data/latest.json, which the app reads directly from GitHub - no server,
 // no phone/laptop needed to keep this running.
 import { writeFile, mkdir, readFile } from "node:fs/promises";
-import { sendPushToTokens } from "./fcm.mjs";
+import { sendNtfyAlert } from "./ntfy.mjs";
 
 const ALERT_THRESHOLD_PERCENT = -1; // notify when a followed stock drops this much or more
 
@@ -66,14 +66,13 @@ async function readJson(path, fallback) {
 }
 
 async function checkAndSendAlerts(stocks) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!serviceAccountJson) {
-    console.log("No FIREBASE_SERVICE_ACCOUNT_JSON secret set - skipping alert check.");
+  const topic = process.env.NTFY_TOPIC;
+  if (!topic) {
+    console.log("No NTFY_TOPIC secret set - skipping alert check.");
     return;
   }
 
   const followings = await readJson("data/followings.json", { insCodes: [] });
-  const tokensFile = await readJson("data/push-tokens.json", { tokens: [] });
   const today = new Date().toISOString().slice(0, 10); // UTC date is fine here -
   // the whole trading window falls inside one UTC day.
   const alertState = await readJson("data/alert-state.json", { date: today, alerted: [] });
@@ -97,12 +96,12 @@ async function checkAndSendAlerts(stocks) {
     }
   }
 
-  if (newAlerts.length > 0 && tokensFile.tokens?.length > 0) {
-    const serviceAccount = JSON.parse(serviceAccountJson);
+  if (newAlerts.length > 0) {
     for (const stock of newAlerts) {
-      await sendPushToTokens(serviceAccount, tokensFile.tokens, {
+      await sendNtfyAlert(topic, {
         title: `${stock.symbol} is down ${Math.abs(stock.priceChangePercent).toFixed(1)}%`,
-        body: `${stock.name} dropped to ${stock.lastPrice?.toLocaleString() ?? "?"}`,
+        message: `${stock.name} dropped to ${stock.lastPrice?.toLocaleString() ?? "?"}`,
+        tags: ["chart_with_downwards_trend"],
       });
       alertState.alerted.push(stock.insCode);
     }

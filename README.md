@@ -45,33 +45,28 @@ immediately, and the other phone picks it up the next time it's opened.
 
 ## Emergency push alerts (followed stock drops 1%+ in a day)
 
-This part needs a one-time Firebase setup, since sending a push notification
-to a specific phone - even while it's idle - requires Google's push
-infrastructure (Firebase Cloud Messaging, free, no credit card needed).
+This uses [ntfy.sh](https://ntfy.sh), a free push-notification service that
+needs no sign-up, no Google account, and no Google Play Services on the
+phone (its Android app is on F-Droid) - which matters here since Firebase
+requires working Google Play Services, and both Firebase itself and Google
+Play Services are unreliable on many Android phones in Iran.
 
-1. Go to [console.firebase.google.com](https://console.firebase.google.com),
-   **Add project** (any name, Analytics can be skipped).
-2. Inside the project, click **Add app → Android**. For the package name,
-   enter exactly: `com.tsestockapp.app`
-3. Download the generated **`google-services.json`** and place it at the
-   **root of this project** (next to `app.json`) - then commit and push it.
-4. Back in the Firebase console: **Project settings (gear icon) → Service
-   accounts → Generate new private key**. This downloads a second JSON file
-   - keep this one secret, don't commit it to the repo.
-5. On GitHub: **repo → Settings → Secrets and variables → Actions → New
-   repository secret**. Name it `FIREBASE_SERVICE_ACCOUNT_JSON`, and paste
-   the *entire contents* of that service-account file as the value.
-6. Push the code changes (including `google-services.json`) and let the
-   "Build APK" workflow run - the new release APK will include push support.
-7. Install the new APK on both phones and open the app once on each - this
-   registers each phone's push token to `data/push-tokens.json`
-   automatically (as long as a GitHub token is set in Settings on that
-   phone, per the sync section above).
+1. Pick a hard-to-guess topic name - since there's no sign-up, the topic
+   name doubles as your password. Something like `tse-<random-string>`
+   works well.
+2. On GitHub: **repo → Settings → Secrets and variables → Actions → New
+   repository secret**. Name it `NTFY_TOPIC`, value is the topic name you
+   picked.
+3. On **both** phones: install the **ntfy** app ([F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/)
+   or [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy)),
+   open it, tap **+** to subscribe to a topic, and enter the same topic name.
 
-Once all of that is in place: every 10-minute check also looks at your
-followed stocks, and if any has dropped 1% or more since yesterday's close,
-both phones get a push notification - once per stock per day, so it won't
-spam you every 10 minutes once triggered.
+That's it - no app rebuild needed for this part, since alerts are sent
+straight from the GitHub Action to the ntfy app, not through this app at
+all. Once set up: every 10-minute check also looks at your followed
+stocks, and if any has dropped 1% or more since yesterday's close, both
+phones get a push notification - once per stock per day, so it won't spam
+you every 10 minutes once triggered.
 
 ## Data source & legality
 
