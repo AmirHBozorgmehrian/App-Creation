@@ -1,43 +1,48 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Modal, ActivityIndicator } from "react-native";
-import { WebView } from "react-native-webview";
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import { colors } from "../theme";
 import MiniChart from "../components/MiniChart";
-import { GoldHistory, GoldItem, REFRESH_EVERY_MS } from "../../shared/gold";
-import { getHistory } from "../gold/goldService";
+import { DayPoint, GoldItem, formatJalaliYmd } from "../../shared/gold";
+import { getItemHistory } from "../gold/goldService";
 import { arrow, fmtInt, fmtPct, trendColor } from "../utils/format";
 
+// Same five ranges the site offers.
 const RANGES = [
-  { label: "1D", ms: 24 * 3600e3 },
-  { label: "1W", ms: 7 * 24 * 3600e3 },
-  { label: "1M", ms: 30 * 24 * 3600e3 },
-  { label: "All", ms: Infinity },
+  { label: "1W", days: 7 },
+  { label: "1M", days: 30 },
+  { label: "3M", days: 90 },
+  { label: "6M", days: 180 },
+  { label: "1Y", days: 365 },
 ];
 
 export default function GoldDetailScreen({ item, sectionTitle, onBack }: { item: GoldItem; sectionTitle: string; onBack: () => void }) {
-  const [history, setHistory] = useState<GoldHistory | null>(null);
-  const [loadingHist, setLoadingHist] = useState(true);
   const [range, setRange] = useState(1);
-  const [showSite, setShowSite] = useState(false);
+  const [pts, setPts] = useState<DayPoint[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    getHistory().then((h) => { setHistory(h); setLoadingHist(false); }).catch(() => setLoadingHist(false));
-  }, []);
+    let alive = true;
+    setPts(null);
+    setErr(null);
+    getItemHistory(item.itemId, RANGES[range].days)
+      .then((p) => alive && setPts(p))
+      .catch((e) => alive && setErr(e?.message ?? "Could not load the chart"));
+    return () => {
+      alive = false;
+    };
+  }, [item.itemId, range]);
 
-  const values = useMemo(() => {
-    if (!history) return [];
-    const i = history.keys.indexOf(item.id);
-    if (i < 0) return [];
-    const from = Date.now() - RANGES[range].ms;
-    const out: number[] = [];
-    for (const p of history.points) {
-      const v = p[3][i];
-      if (p[0] >= from && v !== null && v !== undefined) out.push(v);
-    }
-    return out;
-  }, [history, range, item.id]);
+  const stats = useMemo(() => {
+    if (!pts || pts.length < 2) return null;
+    const sells = pts.map((p) => p.sell ?? p.buy ?? 0);
+    const first = sells[0];
+    const last = sells[sells.length - 1];
+    return { low: Math.min(...sells), high: Math.max(...sells), pct: ((last - first) / first) * 100 };
+  }, [pts]);
 
   const pct = item.change?.pct ?? null;
+  const hasBuy = !!pts && pts.some((p) => p.buy !== null);
+
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
@@ -47,7 +52,7 @@ export default function GoldDetailScreen({ item, sectionTitle, onBack }: { item:
         <Text style={styles.header} numberOfLines={2}>{item.title}</Text>
       </View>
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
-        <Text style={styles.section}>{sectionTitle} · prices in Toman</Text>
+        <Text style={styles.section}>{sectionTitle} · prices in Toman{item.unit ? ` · per ${item.unit}` : ""}</Text>
 
         <View style={styles.card}>
           <View style={styles.pair}>
@@ -64,7 +69,7 @@ export default function GoldDetailScreen({ item, sectionTitle, onBack }: { item:
             {arrow(pct)} {fmtPct(pct)}
             {item.change ? `  (${item.change.abs > 0 ? "+" : ""}${fmtInt(item.change.abs)})` : ""}
           </Text>
-          <Text style={styles.small}>vs last business-day close{item.siteChange ? ` · site shows: ${item.siteChange}` : ""}</Text>
+          <Text style={styles.small}>vs the site's last recorded day before today</Text>
         </View>
 
         <View style={styles.rangeRow}>
@@ -75,42 +80,29 @@ export default function GoldDetailScreen({ item, sectionTitle, onBack }: { item:
           ))}
         </View>
 
-        {loadingHist ? (
+        {err ? (
+          <Text style={styles.warn}>{err}</Text>
+        ) : !pts ? (
           <ActivityIndicator style={{ marginTop: 30 }} color={colors.primary} />
-        ) : values.length >= 2 ? (
-          <MiniChart values={values} />
+        ) : pts.length < 2 ? (
+          <Text style={styles.small}>The site has no price history for this range.</Text>
         ) : (
-          <Text style={styles.small}>
-            Not enough history yet for this range. The monitor adds one point every 30 min in business hours, so charts fill in over the next days.
-          </Text>
-        )}
-
-        {item.chartImage ? (
-          <View style={{ marginTop: 18 }}>
-            <Text style={styles.small}>Sarafiyaran's chart (reloaded every 30 min)</Text>
-            <Image
-              source={{ uri: `${item.chartImage}${item.chartImage.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / REFRESH_EVERY_MS)}` }}
-              style={styles.siteImg}
-              resizeMode="contain"
+          <>
+            <MiniChart
+              series={[
+                { values: pts.map((p) => p.sell), color: colors.primary },
+                ...(hasBuy ? [{ values: pts.map((p) => p.buy), color: colors.textMuted }] : []),
+              ]}
+              startLabel={formatJalaliYmd(pts[0].ymd)}
+              endLabel={formatJalaliYmd(pts[pts.length - 1].ymd)}
             />
-          </View>
-        ) : null}
-
-        {item.chartUrl ? (
-          <TouchableOpacity style={styles.siteBtn} onPress={() => setShowSite(true)}>
-            <Text style={styles.siteBtnText}>Open Sarafiyaran's own chart</Text>
-          </TouchableOpacity>
-        ) : null}
+            <Text style={styles.small}>
+              Line: sell{hasBuy ? " (blue) and buy (grey)" : ""} · closed days skipped
+              {stats ? `\nRange: low ${fmtInt(stats.low)} · high ${fmtInt(stats.high)} · ${fmtPct(stats.pct)} over the period` : ""}
+            </Text>
+          </>
+        )}
       </ScrollView>
-
-      <Modal visible={showSite} animationType="slide" onRequestClose={() => setShowSite(false)}>
-        <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: 40 }}>
-          <TouchableOpacity onPress={() => setShowSite(false)} style={{ padding: 12 }}>
-            <Text style={{ color: colors.primary, fontWeight: "700" }}>Close</Text>
-          </TouchableOpacity>
-          {item.chartUrl ? <WebView source={{ uri: item.chartUrl }} startInLoadingState /> : null}
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -126,12 +118,10 @@ const styles = StyleSheet.create({
   k: { color: colors.textMuted, fontSize: 12 },
   v: { color: colors.text, fontSize: 20, fontWeight: "700", marginTop: 2 },
   trend: { fontSize: 15, fontWeight: "700", marginTop: 12 },
-  small: { color: colors.textMuted, fontSize: 12, marginTop: 6, lineHeight: 17 },
+  small: { color: colors.textMuted, fontSize: 12, marginTop: 8, lineHeight: 17 },
+  warn: { color: colors.negative, fontSize: 12, marginTop: 10 },
   rangeRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
   chip: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   chipOn: { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
   chipText: { color: colors.textMuted, fontWeight: "600", fontSize: 12 },
-  siteImg: { width: "100%", height: 220, marginTop: 6, backgroundColor: colors.surface, borderRadius: 12 },
-  siteBtn: { marginTop: 18, backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  siteBtnText: { color: colors.white, fontWeight: "700" },
 });

@@ -1,80 +1,133 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  CatalogItem,
+  DayPoint,
+  DayRef,
   GoldHistory,
   GoldSnapshot,
-  SITE_URL,
+  USD_ITEM_ID,
   buildSnapshot,
+  dayRefFromHistory,
   emptyHistory,
+  fetchCatalog,
+  fetchHistory,
   fetchOunceUsd,
-  fetchWithTimeout,
+  fetchPrices,
+  iranYmd,
 } from "../../shared/gold";
 
-const SNAPSHOT_KEY = "gold:snapshot";
-const HISTORY_KEY = "gold:localHistory";
+const SNAPSHOT_KEY = "gold:snapshot2";
+const HISTORY_KEY = "gold:mggHistory";
+const CATALOG_KEY = "gold:catalog";
+const REFS_KEY = "gold:dayRefs";
+const DAY = 24 * 3600 * 1000;
 
-export async function loadCachedSnapshot(): Promise<GoldSnapshot | null> {
+async function readJson<T>(key: string): Promise<T | null> {
   try {
-    const raw = await AsyncStorage.getItem(SNAPSHOT_KEY);
-    return raw ? (JSON.parse(raw) as GoldSnapshot) : null;
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
   } catch {
     return null;
   }
 }
-
-export async function saveCachedSnapshot(s: GoldSnapshot): Promise<void> {
+async function writeJson(key: string, value: unknown): Promise<void> {
   try {
-    await AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(s));
+    await AsyncStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* cache is best-effort */
+    /* caches are best-effort */
   }
 }
 
-export async function getHistory(): Promise<GoldHistory> {
+export const loadCachedSnapshot = () => readJson<GoldSnapshot>(SNAPSHOT_KEY);
+export const saveCachedSnapshot = (s: GoldSnapshot) => writeJson(SNAPSHOT_KEY, s);
+
+// The item list (names, ids, boxes) hardly ever changes: refresh it once a day.
+async function getCatalog(nowMs: number): Promise<CatalogItem[]> {
+  const cached = await readJson<{ at: number; items: CatalogItem[] }>(CATALOG_KEY);
+  if (cached && nowMs - cached.at < DAY) return cached.items;
   try {
-    const raw = await AsyncStorage.getItem(HISTORY_KEY);
-    return raw ? (JSON.parse(raw) as GoldHistory) : emptyHistory();
-  } catch {
-    return emptyHistory();
+    const items = await fetchCatalog();
+    await writeJson(CATALOG_KEY, { at: nowMs, items });
+    return items;
+  } catch (e) {
+    if (cached) return cached.items; // stale list is better than none
+    throw e;
   }
 }
 
-/**
- * Everything is fetched by the phone itself: sarafiyaran.com for the gold
- * list + USD rate, and a public JSON API for the world gold price. History
- * (for trends and charts) is kept on the phone, so it only grows while the
- * app is being used. Whatever fails keeps its last value, flagged stale.
- */
+async function pool<T>(items: T[], size: number, fn: (x: T) => Promise<void>): Promise<void> {
+  let i = 0;
+  const workers = Array.from({ length: Math.min(size, items.length) }, async () => {
+    while (i < items.length) await fn(items[i++]);
+  });
+  await Promise.all(workers);
+}
+
+// "Change today" needs yesterday's price for each coin. We read the site's own
+// history once per day per item and keep just that one number.
+async function getDayRefs(ids: number[], nowMs: number): Promise<Record<number, DayRef | null>> {
+  const today = iranYmd(nowMs);
+  let store = await readJson<{ ymd: number; refs: Record<number, DayRef | null> }>(REFS_KEY);
+  if (!store || store.ymd !== today) store = { ymd: today, refs: {} };
+  const missing = ids.filter((id) => !(id in store!.refs));
+  if (missing.length) {
+    await pool(missing, 6, async (id) => {
+      try {
+        const pts = await fetchHistory(id, nowMs - 10 * DAY, nowMs);
+        store!.refs[id] = dayRefFromHistory(pts, nowMs);
+      } catch {
+        /* leave it out; it is retried on the next refresh */
+      }
+    });
+    await writeJson(REFS_KEY, store);
+  }
+  return store.refs;
+}
+
+/** Everything the Gold screen and the MGG banner need, fetched by the phone itself. */
 export async function fetchGold(prev: GoldSnapshot | null): Promise<GoldSnapshot> {
-  const [htmlRes, onsRes] = await Promise.allSettled([
-    (async () => {
-      const res = await fetchWithTimeout(SITE_URL, { headers: { Accept: "text/html" } }, 20000);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.text();
-    })(),
-    fetchOunceUsd(),
-  ]);
+  const nowMs = Date.now();
+  const [catRes, priceRes, onsRes] = await Promise.allSettled([getCatalog(nowMs), fetchPrices(), fetchOunceUsd()]);
 
-  const html = htmlRes.status === "fulfilled" ? htmlRes.value : null;
-  const htmlError = htmlRes.status === "rejected" ? String((htmlRes.reason as any)?.message ?? htmlRes.reason) : null;
+  const catalog = catRes.status === "fulfilled" ? catRes.value : null;
+  const prices = priceRes.status === "fulfilled" ? priceRes.value : null;
   const ons = onsRes.status === "fulfilled" ? onsRes.value : null;
-  const onsError = onsRes.status === "rejected" ? String((onsRes.reason as any)?.message ?? onsRes.reason) : null;
+  const msg = (r: PromiseSettledResult<unknown>) => (r.status === "rejected" ? String((r.reason as any)?.message ?? r.reason) : null);
 
-  if (!html && !ons) throw new Error(htmlError ?? onsError ?? "Could not load gold prices");
+  if (!prices && !ons) throw new Error(msg(priceRes) ?? msg(onsRes) ?? "Could not load gold prices");
+
+  let dayRefs: Record<number, DayRef | null> = {};
+  if (catalog && prices) {
+    const wanted = new Set<number>([USD_ITEM_ID]);
+    const priced = new Set(prices.filter((p) => p.buy !== null || p.sell !== null).map((p) => p.itemId));
+    catalog.forEach((c) => priced.has(c.itemId) && wanted.add(c.itemId));
+    dayRefs = await getDayRefs([...wanted], nowMs);
+  }
 
   const { snapshot, history } = buildSnapshot({
-    html,
-    htmlError,
+    catalog,
+    prices,
+    catalogError: msg(catRes),
+    pricesError: msg(priceRes),
     ons,
-    onsError,
+    onsError: msg(onsRes),
     prev,
-    history: await getHistory(),
-    nowMs: Date.now(),
-    source: "direct",
+    history: (await readJson<GoldHistory>(HISTORY_KEY)) ?? emptyHistory(),
+    dayRefs,
+    nowMs,
   });
-  try {
-    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-  } catch {
-    /* ignore */
-  }
+  await writeJson(HISTORY_KEY, history);
   return snapshot;
+}
+
+// Chart data for one item and range, cached for 20 minutes.
+const memo = new Map<string, { at: number; pts: DayPoint[] }>();
+export async function getItemHistory(itemId: number, days: number): Promise<DayPoint[]> {
+  const key = `${itemId}:${days}`;
+  const hit = memo.get(key);
+  if (hit && Date.now() - hit.at < 20 * 60 * 1000) return hit.pts;
+  const now = Date.now();
+  const pts = await fetchHistory(itemId, now - days * DAY, now);
+  memo.set(key, { at: now, pts });
+  return pts;
 }

@@ -1,17 +1,17 @@
-export interface Change { abs: number; pct: number; since: number }
+export interface Change { abs: number; pct: number; since: number | null }
 
 export interface GoldItem {
   id: string;
+  itemId: number; // the site's own id for this coin / bar / currency
   title: string;
+  unit: string;
   buy: number | null;
   sell: number | null;
-  siteChange: string | null; // raw text of the site's own "change" cell
-  chartUrl: string | null; // the site's own chart link, if one was found
-  chartImage: string | null; // chart picture used by the site, if it is a plain image
-  change: Change | null; // change since the last Iranian business day close
+  change: Change | null; // vs the last recorded day before today (site history)
+  modifiedOn: string | null;
 }
 
-export interface GoldSection { title: string; siteTime: string | null; items: GoldItem[] }
+export interface GoldSection { title: string; items: GoldItem[] }
 
 export interface UsdRate { buy: number | null; sell: number | null; toman: number; rial: number; stale: boolean }
 
@@ -26,9 +26,9 @@ export interface Mgg {
 export interface GoldSnapshot {
   v: number;
   generatedAt: string;
-  source: "action" | "direct";
+  source: "direct";
   unit: "toman";
-  sarafi: { ok: boolean; rows: number; error: string | null; lastOkAt: string | null };
+  sarafi: { ok: boolean; rows: number; error: string | null; priceTime: string | null; lastOkAt: string | null };
   onsError: string | null;
   ons: { usd: number; source: string; stale: boolean } | null;
   usdRate: UsdRate | null;
@@ -43,21 +43,35 @@ export interface GoldHistory {
   points: [number, number | null, number | null, (number | null)[]][];
 }
 
-export const SITE_URL: string;
+export interface CatalogItem { itemId: number; categoryId: number; title: string; unit: string; sortOrder: number }
+export interface PriceRow { itemId: number; buy: number | null; sell: number | null; modifiedOn: string | null }
+export interface DayPoint { ymd: number; buy: number | null; sell: number | null }
+export interface DayRef { v: number; ymd: number }
+
+export const USD_ITEM_ID: number;
 export const MG_PER_TROY_OUNCE: number;
 export const REFRESH_EVERY_MS: number;
 export function isIranBusinessTime(date: Date | number): boolean;
 export function iranDayStart(ms: number): number;
+export function iranYmd(ms: number): number;
+export function formatJalaliYmd(ymd: number): string;
+export function formatJalaliIso(iso: string): string;
 export function fetchWithTimeout(url: string, opts?: RequestInit, ms?: number): Promise<Response>;
+export function fetchCatalog(): Promise<CatalogItem[]>;
+export function fetchPrices(): Promise<PriceRow[]>;
+export function fetchHistory(itemId: number, fromMs: number, toMs: number): Promise<DayPoint[]>;
+export function dayRefFromHistory(points: DayPoint[], nowMs: number): DayRef | null;
 export function fetchOunceUsd(): Promise<{ usd: number; source: string; stale: boolean }>;
 export function emptyHistory(): GoldHistory;
 export function buildSnapshot(args: {
-  html?: string | null;
-  htmlError?: string | null;
+  catalog?: CatalogItem[] | null;
+  prices?: PriceRow[] | null;
+  catalogError?: string | null;
+  pricesError?: string | null;
   ons?: { usd: number; source: string } | null;
   onsError?: string | null;
   prev?: GoldSnapshot | null;
   history?: GoldHistory | null;
+  dayRefs?: Record<number, DayRef | null>;
   nowMs: number;
-  source?: "action" | "direct";
 }): { snapshot: GoldSnapshot; history: GoldHistory };

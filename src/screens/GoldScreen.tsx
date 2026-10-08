@@ -1,16 +1,14 @@
 import React from "react";
-import { View, Text, Modal, SectionList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from "react-native";
-import { WebView } from "react-native-webview";
+import { View, Text, SectionList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from "react-native";
 import { colors } from "../theme";
 import MggBanner from "../components/MggBanner";
 import { useGold } from "../gold/GoldContext";
-import { GoldItem, SITE_URL } from "../../shared/gold";
+import { GoldItem, formatJalaliIso } from "../../shared/gold";
 import { arrow, fmtInt, fmtPct, timeAgo, trendColor } from "../utils/format";
 
 export default function GoldScreen({ onOpenItem, onBack }: { onOpenItem: (item: GoldItem, section: string) => void; onBack: () => void }) {
   const { snapshot, loading, refreshing, syncing, refresh, error, source, lastFetchAt } = useGold();
-  const [showSite, setShowSite] = React.useState(false);
-  const sections = (snapshot?.sections ?? []).map((s) => ({ title: s.title, siteTime: s.siteTime, data: s.items }));
+  const sections = (snapshot?.sections ?? []).map((s) => ({ title: s.title, data: s.items }));
 
   const header = (
     <View>
@@ -19,13 +17,10 @@ export default function GoldScreen({ onOpenItem, onBack }: { onOpenItem: (item: 
         <Text style={styles.warn}>Sarafiyaran data is stale: {snapshot.sarafi.error}</Text>
       ) : null}
       {error ? <Text style={styles.warn}>Couldn't refresh: {error}</Text> : null}
-      <TouchableOpacity style={styles.siteBtn} onPress={() => setShowSite(true)}>
-        <Text style={styles.siteBtnText}>📊 Open Sarafiyaran's charts</Text>
-      </TouchableOpacity>
       <Text style={styles.meta}>
         Prices in Toman
         {lastFetchAt ? ` · updated ${timeAgo(lastFetchAt)}` : ""}
-        {source === "cache" ? " · saved copy" : ""}
+        {snapshot?.sarafi.priceTime ? ` · site prices ${formatJalaliIso(snapshot.sarafi.priceTime)}` : ""}{source === "cache" ? " · saved copy" : ""}
       </Text>
     </View>
   );
@@ -53,7 +48,6 @@ export default function GoldScreen({ onOpenItem, onBack }: { onOpenItem: (item: 
           renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>{section.title}</Text>
-              {section.siteTime ? <Text style={styles.siteTime}>{section.siteTime}</Text> : null}
             </View>
           )}
           renderItem={({ item, section }) => {
@@ -74,14 +68,6 @@ export default function GoldScreen({ onOpenItem, onBack }: { onOpenItem: (item: 
           }}
         />
       )}
-      <Modal visible={showSite} animationType="slide" onRequestClose={() => setShowSite(false)}>
-        <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: 40 }}>
-          <TouchableOpacity onPress={() => setShowSite(false)} style={{ padding: 12 }}>
-            <Text style={{ color: colors.primary, fontWeight: "700" }}>Close</Text>
-          </TouchableOpacity>
-          <WebView source={{ uri: SITE_URL }} startInLoadingState pullToRefreshEnabled />
-        </View>
-      </Modal>
     </View>
   );
 }
