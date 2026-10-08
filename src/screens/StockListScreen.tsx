@@ -8,8 +8,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Modal,
-  Alert,
 } from "react-native";
 import { Stock } from "../types";
 import { fetchLatestStocks } from "../api/snapshot";
@@ -17,8 +15,6 @@ import { loadFollowings, saveFollowings } from "../storage/followings";
 import { loadStocksCache, saveStocksCache } from "../storage/stocksCache";
 import { normalizeFarsi } from "../utils/normalizeFarsi";
 import { colors } from "../theme";
-import { pullFollowings, pushFollowings } from "../sync/followingsSync";
-import { getGithubToken, setGithubToken } from "../storage/githubToken";
 
 type Tab = "all" | "followings";
 
@@ -42,8 +38,6 @@ export default function StockListScreen() {
   const [followings, setFollowings] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<Tab>("all");
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
-  const [settingsVisible, setSettingsVisible] = useState(false);
-  const [tokenInput, setTokenInput] = useState("");
   const hasCache = useRef(false);
 
   const refreshFromNetwork = useCallback(async (isManual: boolean) => {
@@ -72,15 +66,6 @@ export default function StockListScreen() {
       loadFollowings(),
     ]);
     setFollowings(savedFollowings);
-
-    // Pull whatever the other phone last saved to GitHub. If it succeeds,
-    // that becomes the source of truth for this open; if it fails (no
-    // token yet, offline, file doesn't exist), just keep what's local.
-    const remote = await pullFollowings();
-    if (remote) {
-      setFollowings(remote);
-      await saveFollowings(remote);
-    }
 
     if (cache && cache.data.length > 0) {
       // Show the last known list immediately, no spinner, then sync quietly.
@@ -114,27 +99,6 @@ export default function StockListScreen() {
     }
     setFollowings(next);
     await saveFollowings(next);
-    const synced = await pushFollowings(next);
-    if (!synced) {
-      const token = await getGithubToken();
-      if (!token) {
-        Alert.alert(
-          "Not synced to your other phone",
-          "Add a GitHub token in Settings to keep both phones in sync.",
-        );
-      }
-    }
-  };
-
-  const openSettings = async () => {
-    const existing = await getGithubToken();
-    setTokenInput(existing ?? "");
-    setSettingsVisible(true);
-  };
-
-  const saveToken = async () => {
-    await setGithubToken(tokenInput);
-    setSettingsVisible(false);
   };
 
   const visibleStocks = useMemo(() => {
@@ -157,9 +121,6 @@ export default function StockListScreen() {
         <Text style={styles.header}>TSE Stock App</Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           {syncing && <ActivityIndicator size="small" color={colors.textMuted} />}
-          <TouchableOpacity onPress={openSettings}>
-            <Text style={styles.settingsIcon}>⚙</Text>
-          </TouchableOpacity>
         </View>
       </View>
       {updatedAt !== null && (
@@ -284,42 +245,6 @@ export default function StockListScreen() {
         />
       )}
 
-      <Modal visible={settingsVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Sync Settings</Text>
-            <Text style={styles.modalBody}>
-              Paste a GitHub personal access token (fine-grained, scoped only
-              to this repo, with Contents: Read and write permission). This
-              lets Followings sync between your phones.
-            </Text>
-            <TextInput
-              style={styles.tokenInput}
-              placeholder="github_pat_..."
-              placeholderTextColor={colors.textMuted}
-              value={tokenInput}
-              onChangeText={setTokenInput}
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-            />
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.surfaceAlt }]}
-                onPress={() => setSettingsVisible(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                onPress={saveToken}
-              >
-                <Text style={styles.modalButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
