@@ -16,3 +16,23 @@ used only to build the .apk (`.github/workflows/build-apk.yml`).
   plus pull-down to refresh any time.
 - Coin/currency trends and charts come from the site's own history, so they
   work from the first launch. Only the MGG trend uses history kept on the phone.
+
+## Coin swaps (Gold page -> "Swaps")
+
+Side panel for the "sell one coin, buy another of equal gold weight, keep the
+difference" trade (e.g. 1 full coin <-> 2 half coins, 2 half <-> 4 quarter,
+before/after 86, Bahar Azadi, ...).
+
+- Tick the coins you have and the ones you'd buy, set a minimum profit (% of the
+  money received). The panel lists the current swaps above it.
+- With **Notify me** on, a notification says what to sell, what to buy and the
+  profit. Checked after every price refresh and by a background task about
+  every 15 min in Iranian business hours (Android decides the exact timing, and
+  battery saver can delay it). The same swap is repeated at most every 3 h
+  unless it improves by 1 point.
+- Prices: you receive the site's "Buy" price when selling and pay its "Sell"
+  price when buying, so the spread is already counted.
+- Only the bank-coin box is used. Weights live in `COIN_GRAMS` and the title
+  matching in `coinSpec()` (`shared/gold.js`). Coins with no whole-number
+  match in weight (the 1 g coin) are skipped.
+- Code: `shared/gold.js` (`findSwaps`), `src/arbitrage/*`, `src/components/SwapPanel.tsx`.

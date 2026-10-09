@@ -21,7 +21,19 @@
         "foregroundImage": "./assets/adaptive-icon-foreground.png",
         "backgroundColor": "#020a1c"
       },
-      "navigationBarColor": "#020a1c"
-    }
+      "navigationBarColor": "#020a1c",
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#0177ff"
+        }
+      ]
+    ]
   }
 }

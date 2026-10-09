@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { colors } from "../theme";
 import { useGold } from "../gold/GoldContext";
-import { TOMAN_TO_RIAL } from "../../shared/gold";
+import { TOMAN_TO_RIAL, formatJalaliYmd, formatJalaliMs } from "../../shared/gold";
 import { arrow, fmtInt, fmtPct, fmtUsd, timeAgo, trendColor } from "../utils/format";
 
 export default function MggBanner() {
@@ -16,6 +16,15 @@ export default function MggBanner() {
     const id = setInterval(() => setTick((t) => t + 1), 30000);
     return () => clearInterval(id);
   }, []);
+
+  const ref = mgg?.ref ?? null;
+  const refText = !ref
+    ? ""
+    : ref.kind === "close"
+    ? `Compared to yesterday's close${ref.ymd ? ` (${formatJalaliYmd(ref.ymd)})` : ""}`
+    : ref.t
+    ? `Compared to ${formatJalaliMs(ref.t)}`
+    : "";
 
   const updated = syncing ? "Updating…" : lastFetchAt ? `Updated ${timeAgo(lastFetchAt)}` : "";
 
@@ -53,7 +62,10 @@ export default function MggBanner() {
           {snapshot?.usdRate ? ` · Sarafiyaran USD ${fmtInt(snapshot.usdRate.toman)}` : ""}
           {mgg?.stale ? " · stale" : ""}
         </Text>
-        <Text style={styles.foot}>{updated}</Text>
+        <View style={styles.footRight}>
+          {refText ? <Text style={styles.foot}>{refText}</Text> : null}
+          <Text style={styles.foot}>{updated}</Text>
+        </View>
       </View>
     </View>
   );
@@ -79,5 +91,6 @@ const styles = StyleSheet.create({
   muted: { color: colors.textMuted },
   footRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 5 },
   foot: { color: colors.textMuted, fontSize: 10 },
+  footRight: { alignItems: "flex-end" },
   footLeft: { flexShrink: 1, marginRight: 8 },
 });

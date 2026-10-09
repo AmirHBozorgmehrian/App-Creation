@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { AppState } from "react-native";
 import { GoldSnapshot, REFRESH_EVERY_MS, isIranBusinessTime } from "../../shared/gold";
 import { fetchGold, loadCachedSnapshot, saveCachedSnapshot } from "./goldService";
+import { checkAndNotify, coinItemsFromSnapshot } from "../arbitrage/engine";
 
 interface GoldState {
   snapshot: GoldSnapshot | null;
@@ -49,6 +50,7 @@ export function GoldProvider({ children }: { children: React.ReactNode }) {
       lastFetch.current = Date.now();
       setLastFetchAt(lastFetch.current);
       saveCachedSnapshot(snap);
+      checkAndNotify(coinItemsFromSnapshot(snap)).catch(() => {}); // swap alerts
     } catch (e: any) {
       setError(e?.message ?? "Could not refresh gold prices");
     } finally {

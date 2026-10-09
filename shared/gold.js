@@ -114,6 +114,12 @@ function formatJalaliYmd(ymd) {
   return j[0] + "/" + pad2(j[1]) + "/" + pad2(j[2]);
 }
 
+// timestamp -> "1405/07/16 14:58" (Iran time)
+function formatJalaliMs(ms) {
+  var d = iranDate(ms);
+  return formatJalaliYmd(iranYmd(ms)) + " " + pad2(d.getUTCHours()) + ":" + pad2(d.getUTCMinutes());
+}
+
 // "2026-10-08T14:58:49.1" (Iran local) -> "1405/07/16 14:58"
 function formatJalaliIso(iso) {
   var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || "");
@@ -188,7 +194,12 @@ async function fetchHistory(itemId, fromMs, toMs) { return parseHistory(await fe
 function dayRefFromHistory(points, nowMs) {
   var today = iranYmd(nowMs);
   for (var i = points.length - 1; i >= 0; i--) {
-    if (points[i].ymd < today) return { v: rep(points[i]), ymd: points[i].ymd };
+    if (points[i].ymd < today) {
+      var pt = points[i];
+      var vals = [pt.buy, pt.sell].filter(function (x) { return x !== null; });
+      var mid = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+      return { v: rep(pt), mid: mid, ymd: pt.ymd };
+    }
   }
   return null;
 }
@@ -209,6 +220,47 @@ async function fetchOunceUsd() {
     }
   }
   throw new Error("No world gold price available (" + errors.join("; ") + ")");
+}
+
+// Yesterday's close for the world ounce price, as a RATIO (previous close / price
+// now) taken from ONE source, so it does not matter that the main ounce price
+// comes from a different site. Needs no history stored on the phone.
+var CLOSE_SOURCES = [
+  {
+    name: "goldprice.org",
+    url: "https://data-asg.goldprice.org/dbXRates/USD",
+    ratio: function (j) {
+      var it = j && j.items && j.items[0];
+      return it ? Number(it.xauClose) / Number(it.xauPrice) : NaN;
+    },
+  },
+  {
+    name: "yahoo GC=F",
+    url: "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?range=5d&interval=1d",
+    ratio: function (j) {
+      var r = j && j.chart && j.chart.result && j.chart.result[0];
+      if (!r) return NaN;
+      var closes = ((r.indicators && r.indicators.quote && r.indicators.quote[0].close) || []).filter(function (x) {
+        return x !== null && x !== undefined;
+      });
+      var price = Number(r.meta && r.meta.regularMarketPrice);
+      if (closes.length < 2) return NaN;
+      return Number(closes[closes.length - 2]) / price; // [-1] is today's unfinished candle
+    },
+  },
+];
+
+async function fetchOunceCloseRatio() {
+  for (var i = 0; i < CLOSE_SOURCES.length; i++) {
+    var s = CLOSE_SOURCES[i];
+    try {
+      var res = await fetchWithTimeout(s.url, { headers: { Accept: "application/json" } }, 15000);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var r = s.ratio(await res.json());
+      if (isFinite(r) && r > 0.8 && r < 1.25) return { ratio: r, source: s.name };
+    } catch (e) { /* try the next source */ }
+  }
+  return null;
 }
 
 function computeMgg(onsUsd, rialRate) {
@@ -255,6 +307,92 @@ function refValue(points, get, nowMs) {
 function changeFrom(cur, ref) {
   if (cur === null || cur === undefined || !ref || !ref.v) return null;
   return { abs: cur - ref.v, pct: ((cur - ref.v) / ref.v) * 100, since: ref.t || null };
+}
+
+
+// ------------------------------------------------------- coin swaps (arbitrage) ---
+// Same gold, different price: sell one kind of coin, buy another of equal gold
+// weight, keep the toman difference. Only the bank-coin box is considered.
+//
+// PRICE SIDE (dealer's point of view, as on the site): "sell" = what YOU pay to
+// buy a coin, "buy" = what you RECEIVE when you sell a coin to the dealer.
+// So the spread is already inside every result (conservative).
+var COIN_CATEGORY_ID = 7;
+// Coin weights in grams. Only the RATIOS matter (equal-gold check).
+// full / half / quarter are the official 8.133 g (900 fineness) series;
+// the 1-gram coin is 1 g. Edit here if a weight is wrong.
+var COIN_GRAMS = { full: 8.133, half: 4.0665, quarter: 2.03325, gram: 1.0 };
+
+function normTitle(t) {
+  return String(t || "")
+    .replace(/[\u064A\u0649]/g, "\u06CC")
+    .replace(/\u0643/g, "\u06A9")
+    .replace(/[\u06F0-\u06F9]/g, function (c) { return String(c.charCodeAt(0) - 0x06F0); })
+    .replace(/[\u0660-\u0669]/g, function (c) { return String(c.charCodeAt(0) - 0x0660); })
+    .replace(/\u200c/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Title -> { size, kind, grams } or null when it is not a recognised coin.
+// kind: pre86 (قبل 86) | bahar (بهار آزادی) | emami86 (امامی 86) | other
+function coinSpec(title) {
+  var t = normTitle(title);
+  if (/\u0634\u0645\u0634/.test(t)) return null; // bars (شمش) are not coins
+  var size = null;
+  if (/\u0631\u0628\u0639/.test(t)) size = "quarter"; // ربع
+  else if (/\u0646\u06CC\u0645/.test(t)) size = "half"; // نیم
+  else if (/\u06AF\u0631\u0645\u06CC/.test(t)) size = "gram"; // گرمی
+  else if (/\u062A\u0645\u0627\u0645|\u0627\u0645\u0627\u0645\u06CC|\u0628\u0647\u0627\u0631/.test(t)) size = "full"; // تمام|امامی|بهار
+  if (!size) return null;
+  var kind = /\u0642\u0628\u0644/.test(t) ? "pre86" : /\u0628\u0647\u0627\u0631/.test(t) ? "bahar" : /86/.test(t) ? "emami86" : "other";
+  return { size: size, kind: kind, grams: COIN_GRAMS[size] };
+}
+
+// Smallest whole-coin counts (a of one, b of the other, each <= 8) with equal gold.
+function swapCounts(gramsSold, gramsBought) {
+  for (var a = 1; a <= 8; a++) {
+    var b = Math.round((a * gramsSold) / gramsBought);
+    if (b >= 1 && b <= 8 && Math.abs(a * gramsSold - b * gramsBought) / (a * gramsSold) < 0.002) return { a: a, b: b };
+  }
+  return null;
+}
+
+// items: [{ id, title, buy, sell }]   opts: { have: [id], want: [id] }
+// -> every sell-X / buy-Y option, best profit first. pct = profit / money received.
+function findSwaps(items, opts) {
+  var have = (opts && opts.have) || [];
+  var want = (opts && opts.want) || [];
+  var byId = {};
+  (items || []).forEach(function (it) {
+    var spec = coinSpec(it.title);
+    if (spec) byId[it.id] = { it: it, spec: spec };
+  });
+  var out = [];
+  have.forEach(function (hid) {
+    want.forEach(function (wid) {
+      if (hid === wid) return;
+      var H = byId[hid];
+      var W = byId[wid];
+      if (!H || !W) return;
+      var recv = H.it.buy; // dealer buys from you
+      var pay = W.it.sell; // dealer sells to you
+      if (recv === null || recv === undefined || pay === null || pay === undefined) return;
+      var c = swapCounts(H.spec.grams, W.spec.grams);
+      if (!c) return;
+      var proceeds = c.a * recv;
+      var cost = c.b * pay;
+      var profit = proceeds - cost;
+      out.push({
+        key: hid + ">" + wid,
+        sellId: hid, sellTitle: H.it.title, sellCount: c.a, sellUnit: recv, proceeds: proceeds,
+        buyId: wid, buyTitle: W.it.title, buyCount: c.b, buyUnit: pay, cost: cost,
+        profit: profit, pct: (profit / proceeds) * 100, grams: c.a * H.spec.grams,
+      });
+    });
+  });
+  out.sort(function (x, y) { return y.pct - x.pct; });
+  return out;
 }
 
 // ---------------------------------------------------------- the snapshot ---
@@ -355,14 +493,33 @@ function buildSnapshot(args) {
 
   if (ons) {
     var m = computeMgg(ons.usd, usdRate ? usdRate.rial : null);
-    var refUsd = refValue(pts, function (p) { return p[1] === null ? null : p[1] / MG_PER_TROY_OUNCE; }, nowMs);
-    var refRial = refValue(pts, function (p) { return p[1] === null || p[2] === null ? null : (p[1] / MG_PER_TROY_OUNCE) * p[2]; }, nowMs);
+    // Preferred: yesterday's real closes (works from the very first launch).
+    var refUsd = null;
+    var refRial = null;
+    var cr = args.ounceClose && args.ounceClose.ratio ? args.ounceClose.ratio : null;
+    if (cr) {
+      var prevUsd = (ons.usd * cr) / MG_PER_TROY_OUNCE;
+      refUsd = { v: prevUsd, t: null };
+      var uref = dayRefs[USD_ITEM_ID];
+      var prevRate = uref ? (uref.mid || uref.v) : null; // toman per USD yesterday
+      if (prevRate) refRial = { v: prevUsd * prevRate * TOMAN_TO_RIAL, t: null };
+    }
+    // Fallback: history the phone recorded itself (only after it has run a while).
+    var refInfo = null;
+    if (refUsd) {
+      var uy = dayRefs[USD_ITEM_ID] ? dayRefs[USD_ITEM_ID].ymd : null;
+      refInfo = { kind: "close", ymd: uy, t: null };
+    }
+    if (!refUsd) refUsd = refValue(pts, function (p) { return p[1] === null ? null : p[1] / MG_PER_TROY_OUNCE; }, nowMs);
+    if (!refRial) refRial = refValue(pts, function (p) { return p[1] === null || p[2] === null ? null : (p[1] / MG_PER_TROY_OUNCE) * p[2]; }, nowMs);
     snap.mgg = {
       usd: m.usd,
       rial: m.rial,
       usdChange: changeFrom(m.usd, refUsd),
       rialChange: m.rial === null ? null : changeFrom(m.rial, refRial),
       stale: !!(ons.stale || (usdRate && usdRate.stale)),
+      // what the trend is measured against (shown under the card)
+      ref: refInfo || (refUsd ? { kind: "phone", ymd: null, t: refUsd.t || null } : null),
     };
   }
 
@@ -384,6 +541,7 @@ module.exports = {
   toJalali: toJalali,
   formatJalaliYmd: formatJalaliYmd,
   formatJalaliIso: formatJalaliIso,
+  formatJalaliMs: formatJalaliMs,
   parseCatalog: parseCatalog,
   parsePrices: parsePrices,
   parseHistory: parseHistory,
@@ -393,6 +551,11 @@ module.exports = {
   fetchHistory: fetchHistory,
   dayRefFromHistory: dayRefFromHistory,
   fetchOunceUsd: fetchOunceUsd,
+  COIN_CATEGORY_ID: COIN_CATEGORY_ID,
+  COIN_GRAMS: COIN_GRAMS,
+  coinSpec: coinSpec,
+  findSwaps: findSwaps,
+  fetchOunceCloseRatio: fetchOunceCloseRatio,
   computeMgg: computeMgg,
   emptyHistory: emptyHistory,
   buildSnapshot: buildSnapshot,

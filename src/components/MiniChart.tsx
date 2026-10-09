@@ -10,7 +10,7 @@ export default function MiniChart({
   series,
   startLabel,
   endLabel,
-  height = 190,
+  height = 206,
 }: {
   series: Series[];
   startLabel?: string;
@@ -27,7 +27,7 @@ export default function MiniChart({
   const n = Math.max(1, ...series.map((s) => s.values.length));
   const padX = 8;
   const padTop = 18;
-  const padBottom = 22;
+  const padBottom = 38; // room under the lowest gridline for the min label + dates
   const x = (i: number) => padX + (i / Math.max(1, n - 1)) * Math.max(0, w - padX * 2);
   const y = (v: number) => padTop + (1 - (v - min) / span) * (height - padTop - padBottom);
 
@@ -53,7 +53,7 @@ export default function MiniChart({
         </Svg>
       )}
       <Text style={[styles.lbl, { top: 2, left: 8 }]}>{fmtInt(max)}</Text>
-      <Text style={[styles.lbl, { bottom: 18, left: 8 }]}>{fmtInt(min)}</Text>
+      <Text style={[styles.lbl, { top: height - padBottom + 3, left: 8 }]}>{fmtInt(min)}</Text>
       {startLabel ? <Text style={[styles.lbl, { bottom: 3, left: 8 }]}>{startLabel}</Text> : null}
       {endLabel ? <Text style={[styles.lbl, { bottom: 3, right: 8 }]}>{endLabel}</Text> : null}
     </View>

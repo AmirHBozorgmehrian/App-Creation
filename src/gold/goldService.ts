@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  COIN_CATEGORY_ID,
   CatalogItem,
+  SwapItem,
   DayPoint,
   DayRef,
   GoldHistory,
@@ -12,6 +14,7 @@ import {
   fetchCatalog,
   fetchHistory,
   fetchOunceUsd,
+  fetchOunceCloseRatio,
   fetchPrices,
   iranYmd,
 } from "../../shared/gold";
@@ -19,7 +22,7 @@ import {
 const SNAPSHOT_KEY = "gold:snapshot2";
 const HISTORY_KEY = "gold:mggHistory";
 const CATALOG_KEY = "gold:catalog";
-const REFS_KEY = "gold:dayRefs";
+const REFS_KEY = "gold:dayRefs2"; // v2: refs now carry a buy/sell midpoint
 const DAY = 24 * 3600 * 1000;
 
 async function readJson<T>(key: string): Promise<T | null> {
@@ -87,11 +90,12 @@ async function getDayRefs(ids: number[], nowMs: number): Promise<Record<number, 
 /** Everything the Gold screen and the MGG banner need, fetched by the phone itself. */
 export async function fetchGold(prev: GoldSnapshot | null): Promise<GoldSnapshot> {
   const nowMs = Date.now();
-  const [catRes, priceRes, onsRes] = await Promise.allSettled([getCatalog(nowMs), fetchPrices(), fetchOunceUsd()]);
+  const [catRes, priceRes, onsRes, closeRes] = await Promise.allSettled([getCatalog(nowMs), fetchPrices(), fetchOunceUsd(), fetchOunceCloseRatio()]);
 
   const catalog = catRes.status === "fulfilled" ? catRes.value : null;
   const prices = priceRes.status === "fulfilled" ? priceRes.value : null;
   const ons = onsRes.status === "fulfilled" ? onsRes.value : null;
+  const ounceClose = closeRes.status === "fulfilled" ? closeRes.value : null;
   const msg = (r: PromiseSettledResult<unknown>) => (r.status === "rejected" ? String((r.reason as any)?.message ?? r.reason) : null);
 
   if (!prices && !ons) throw new Error(msg(priceRes) ?? msg(onsRes) ?? "Could not load gold prices");
@@ -111,6 +115,7 @@ export async function fetchGold(prev: GoldSnapshot | null): Promise<GoldSnapshot
     pricesError: msg(priceRes),
     ons,
     onsError: msg(onsRes),
+    ounceClose,
     prev,
     history: (await readJson<GoldHistory>(HISTORY_KEY)) ?? emptyHistory(),
     dayRefs,
@@ -130,4 +135,14 @@ export async function getItemHistory(itemId: number, days: number): Promise<DayP
   const pts = await fetchHistory(itemId, now - days * DAY, now);
   memo.set(key, { at: now, pts });
   return pts;
+}
+
+// Light fetch for the background swap check: only the bank-coin prices.
+export async function fetchCoinItems(): Promise<SwapItem[]> {
+  const nowMs = Date.now();
+  const [catalog, prices] = await Promise.all([getCatalog(nowMs), fetchPrices()]);
+  const byId = new Map(prices.map((p) => [p.itemId, p]));
+  return catalog
+    .filter((c) => c.categoryId === COIN_CATEGORY_ID && byId.has(c.itemId))
+    .map((c) => ({ id: String(c.itemId), title: c.title, buy: byId.get(c.itemId)!.buy, sell: byId.get(c.itemId)!.sell }));
 }
