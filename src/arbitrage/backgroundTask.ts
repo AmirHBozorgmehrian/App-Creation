@@ -2,35 +2,36 @@
 // app in the background just to run it.
 import * as TaskManager from "expo-task-manager";
 import * as BackgroundFetch from "expo-background-fetch";
-import { isIranBusinessTime } from "../../shared/gold";
-import { fetchCoinItems } from "../gold/goldService";
-import { checkAndNotify } from "./engine";
-import { loadSettings } from "./settings";
+import { REFRESH_EVERY_MS, isIranBusinessTime } from "../../shared/gold";
+import { fetchGold, loadCachedSnapshot, saveCachedSnapshot } from "../gold/goldService";
+import { coinItemsFromSnapshot, onCoinPrices } from "./engine";
 
 const TASK = "gold-swap-check";
 
+// Runs about every 30 min, also when the app is closed: refreshes ALL gold data,
+// saves it (so the app opens with fresh prices) and runs the swap check.
 TaskManager.defineTask(TASK, async () => {
   try {
     if (!isIranBusinessTime(new Date())) return BackgroundFetch.BackgroundFetchResult.NoData;
-    const s = await loadSettings();
-    if (!s.enabled) return BackgroundFetch.BackgroundFetchResult.NoData;
-    await checkAndNotify(await fetchCoinItems(), s);
+    const snap = await fetchGold(await loadCachedSnapshot());
+    await saveCachedSnapshot(snap);
+    await onCoinPrices(coinItemsFromSnapshot(snap)); // saves prices; alerts only when switched on
     return BackgroundFetch.BackgroundFetchResult.NewData;
   } catch {
     return BackgroundFetch.BackgroundFetchResult.Failed;
   }
 });
 
-/** Registers (or removes) the periodic check. Android decides the exact timing (>= 15 min). */
-export async function syncBackgroundCheck(enabled: boolean): Promise<void> {
+/** Makes sure the periodic refresh is scheduled. Android decides the exact timing. */
+export async function ensureBackgroundRefresh(): Promise<void> {
   try {
-    const registered = await TaskManager.isTaskRegisteredAsync(TASK);
-    if (enabled && !registered) {
-      await BackgroundFetch.registerTaskAsync(TASK, { minimumInterval: 15 * 60, stopOnTerminate: false, startOnBoot: true });
-    } else if (!enabled && registered) {
-      await BackgroundFetch.unregisterTaskAsync(TASK);
-    }
+    if (await TaskManager.isTaskRegisteredAsync(TASK)) return;
+    await BackgroundFetch.registerTaskAsync(TASK, {
+      minimumInterval: Math.round(REFRESH_EVERY_MS / 1000),
+      stopOnTerminate: false, // keep going after the app is swiped away
+      startOnBoot: true, // and after a phone restart
+    });
   } catch {
-    /* background fetch can be unavailable (battery saver); foreground checks still work */
+    /* unavailable (battery saver / restricted); the app still refreshes while open */
   }
 }

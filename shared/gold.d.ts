@@ -87,7 +87,13 @@ export interface Swap {
   sellId: string; sellTitle: string; sellCount: number; sellUnit: number; proceeds: number;
   buyId: string; buyTitle: string; buyCount: number; buyUnit: number; cost: number;
   profit: number; pct: number; grams: number;
+  dir: SwapDirection;
 }
+export type SwapDirection = "up" | "down" | "same";
+export type DirectionFilter = SwapDirection | "both";
+export interface PriceSample { t: number; p: Record<string, [number | null, number | null]> }
+export interface SwapTrend { prevPct: number; delta: number; dir: 1 | 0 | -1 }
+export function swapTrend(sw: Swap, history: PriceSample[], nowMs: number): SwapTrend | null;
 export const COIN_CATEGORY_ID: number;
 export const COIN_GRAMS: Record<string, number>;
 export const CATEGORIES: Record<number, { title: string; gold: boolean; order: number }>;
@@ -95,4 +101,6 @@ export function coinSpec(title: string): { size: string; kind: string; grams: nu
 export type CoinCategory = "emami86" | "bahar" | "pre86" | "gram";
 export type CategoryPair = [CoinCategory | null, CoinCategory | null];
 export function coinCategory(title: string): CoinCategory | null;
-export function findSwaps(items: SwapItem[], opts: { have: string[]; want: string[]; pairs?: CategoryPair[] }): Swap[];
+export function findSwaps(items: SwapItem[], opts: { have: string[]; want: string[]; pairs?: CategoryPair[]; direction?: DirectionFilter }): Swap[];
+export function splitSwaps(swaps: Swap[], o: { minProfitPct: number; maxLossPct: number }): { up: Swap[]; down: Swap[] };
+export function swapTone(pct: number): "green" | "red" | "grey";

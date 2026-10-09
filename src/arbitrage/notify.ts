@@ -40,14 +40,19 @@ async function send(title: string, body: string) {
   });
 }
 
+export const DIR_LABEL = { up: "▲ Upward swap", down: "▼ Downward swap", same: "↔ Same-size swap" } as const;
+
+const sgn = (n: number) => (n < 0 ? "-" : "+");
+
 export function swapText(s: Swap): { title: string; body: string } {
-  const title = `Gold swap: +${s.pct.toFixed(1)}% (${fmtInt(s.profit)} Toman)`;
+  const title = `${DIR_LABEL[s.dir]}: ${sgn(s.pct)}${Math.abs(s.pct).toFixed(1)}% (${sgn(s.profit)}${fmtInt(Math.abs(s.profit))} Toman)`;
+  const result = s.profit >= 0 ? `KEEP ${fmtInt(s.profit)} Toman` : `LOSE ${fmtInt(-s.profit)} Toman`;
   const body =
     `SELL ${s.sellCount}× ${s.sellTitle}\n` +
     `   ${fmtInt(s.sellUnit)} each = ${fmtInt(s.proceeds)}\n` +
     `BUY ${s.buyCount}× ${s.buyTitle}\n` +
     `   ${fmtInt(s.buyUnit)} each = ${fmtInt(s.cost)}\n` +
-    `KEEP ${fmtInt(s.profit)} Toman · same gold (${s.grams.toFixed(2)} g of coin)`;
+    `${result} · same gold (${s.grams.toFixed(2)} g of coin)`;
   return { title, body };
 }
 
@@ -57,7 +62,7 @@ export async function sendSwapNotification(s: Swap) {
 }
 
 export async function sendSummaryNotification(count: number, best: Swap) {
-  await send(`${count} gold swaps above your threshold`, `Best: +${best.pct.toFixed(1)}% (${fmtInt(best.profit)} Toman). Open the app, Gold, Swaps.`);
+  await send(`${count} gold swaps match your settings`, `Best: ${sgn(best.pct)}${Math.abs(best.pct).toFixed(1)}% (${sgn(best.profit)}${fmtInt(Math.abs(best.profit))} Toman). Open the app, Gold, then the swap tab.`);
 }
 
 export async function sendTestNotification() {

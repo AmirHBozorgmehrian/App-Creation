@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { BackHandler, SafeAreaView, StyleSheet } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { syncBackgroundCheck } from "./src/arbitrage/backgroundTask"; // also defines the background task
-import { loadSettings } from "./src/arbitrage/settings";
+import { ensureBackgroundRefresh } from "./src/arbitrage/backgroundTask"; // also defines the background task
 import StockListScreen from "./src/screens/StockListScreen";
 import HomeScreen, { HomeTarget } from "./src/screens/HomeScreen";
 import GoldScreen from "./src/screens/GoldScreen";
@@ -25,9 +24,9 @@ export default function App() {
   const push = (r: Route) => setStack((s) => [...s, r]);
   const pop = () => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
 
-  // Re-arm the background swap check after a restart / update.
+  // Schedule the 30-min background refresh (also re-arms it after an update).
   useEffect(() => {
-    loadSettings().then((s) => syncBackgroundCheck(s.enabled));
+    ensureBackgroundRefresh();
   }, []);
 
   // Android back button / gesture goes up one screen, and only exits from Home.

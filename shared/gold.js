@@ -400,6 +400,9 @@ function findSwaps(items, opts) {
       if (recv === null || recv === undefined || pay === null || pay === undefined) return;
       var c = swapCounts(H.spec.grams, W.spec.grams);
       if (!c) return;
+      // up = sell smaller coins to buy a bigger one; down = sell a bigger coin to buy smaller ones
+      var dir = H.spec.grams < W.spec.grams ? "up" : H.spec.grams > W.spec.grams ? "down" : "same";
+      if (opts && opts.direction && opts.direction !== "both" && opts.direction !== dir) return;
       var proceeds = c.a * recv;
       var cost = c.b * pay;
       var profit = proceeds - cost;
@@ -407,12 +410,60 @@ function findSwaps(items, opts) {
         key: hid + ">" + wid,
         sellId: hid, sellTitle: H.it.title, sellCount: c.a, sellUnit: recv, proceeds: proceeds,
         buyId: wid, buyTitle: W.it.title, buyCount: c.b, buyUnit: pay, cost: cost,
-        profit: profit, pct: (profit / proceeds) * 100, grams: c.a * H.spec.grams,
+        profit: profit, pct: (profit / proceeds) * 100, grams: c.a * H.spec.grams, dir: dir,
       });
     });
   });
   out.sort(function (x, y) { return y.pct - x.pct; });
   return out;
+}
+
+// Splits swaps into the two lists the user works with.
+//  up   = sell smaller coins (or same-size) -> kept when profit >= minProfitPct
+//  down = sell a bigger coin, buy smaller   -> kept when loss <= maxLossPct (a profit always passes)
+function splitSwaps(swaps, o) {
+  return {
+    up: (swaps || []).filter(function (x) { return x.dir !== "down" && x.pct >= o.minProfitPct; }),
+    down: (swaps || []).filter(function (x) { return x.dir === "down" && x.pct >= -o.maxLossPct; }),
+  };
+}
+
+// Card colour rule: gain >= 0.5% green, loss >= 0.5% red, anything in between grey.
+var SWAP_FLAT_PCT = 0.5;
+function swapTone(pct) {
+  return pct >= SWAP_FLAT_PCT ? "green" : pct <= -SWAP_FLAT_PCT ? "red" : "grey";
+}
+
+// Profit % of a swap at an earlier moment. p = { coinId: [buy, sell] }.
+function swapPctAt(sw, p) {
+  var a = p[sw.sellId];
+  var b = p[sw.buyId];
+  if (!a || !b || a[0] === null || a[0] === undefined || b[1] === null || b[1] === undefined) return null;
+  var proceeds = sw.sellCount * a[0];
+  if (!proceeds) return null;
+  return ((proceeds - sw.buyCount * b[1]) / proceeds) * 100;
+}
+
+var TREND_AGO_MS = 2 * 60 * 60 * 1000;
+var TREND_TOLERANCE_MS = 50 * 60 * 1000;
+var TREND_FLAT_PTS = 0.05; // changes smaller than this (percentage points) count as flat
+
+// history: [{ t, p }] saved coin prices. Compares the swap's profit now with the
+// saved sample closest to 2 h ago (within 50 min). null = no such sample.
+// dir: 1 profit is higher than then, -1 lower, 0 about the same.
+function swapTrend(sw, history, nowMs) {
+  var target = nowMs - TREND_AGO_MS;
+  var best = null;
+  var bestD = Infinity;
+  (history || []).forEach(function (h) {
+    var d = Math.abs(h.t - target);
+    if (d < bestD && d <= TREND_TOLERANCE_MS) { best = h; bestD = d; }
+  });
+  if (!best) return null;
+  var prev = swapPctAt(sw, best.p);
+  if (prev === null) return null;
+  var delta = sw.pct - prev;
+  return { prevPct: prev, delta: delta, dir: Math.abs(delta) < TREND_FLAT_PTS ? 0 : delta > 0 ? 1 : -1 };
 }
 
 // ---------------------------------------------------------- the snapshot ---
@@ -576,6 +627,9 @@ module.exports = {
   coinSpec: coinSpec,
   coinCategory: coinCategory,
   findSwaps: findSwaps,
+  swapTrend: swapTrend,
+  splitSwaps: splitSwaps,
+  swapTone: swapTone,
   fetchOunceCloseRatio: fetchOunceCloseRatio,
   computeMgg: computeMgg,
   emptyHistory: emptyHistory,

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -14,11 +14,11 @@ import {
   View,
 } from "react-native";
 import { colors } from "../theme";
-import { CategoryPair, CoinCategory, Swap, SwapItem } from "../../shared/gold";
+import { CategoryPair, CoinCategory, PriceSample, Swap, SwapDirection, SwapItem, SwapTrend, splitSwaps, swapTone, swapTrend } from "../../shared/gold";
 import { ArbSettings } from "../arbitrage/settings";
 import { ensurePermission, sendTestNotification } from "../arbitrage/notify";
-import { syncBackgroundCheck } from "../arbitrage/backgroundTask";
 import { fmtInt } from "../utils/format";
+import type { Side } from "./DraggableTab";
 
 const W = Dimensions.get("window").width;
 const PANEL_W = Math.min(W * 0.92, 460);
@@ -30,6 +30,9 @@ const CATEGORIES: { id: CoinCategory; label: string }[] = [
   { id: "gram", label: "سکه یک گرمی" },
 ];
 const labelOf = (c: CoinCategory | null) => CATEGORIES.find((x) => x.id === c)?.label ?? "";
+
+const signed = (n: number) => (n < 0 ? "-" : n > 0 ? "+" : "") + fmtInt(Math.abs(n));
+const signedPct = (p: number) => (p < 0 ? "-" : p > 0 ? "+" : "") + Math.abs(p).toFixed(2) + "%";
 
 function Slot({ cat, active, onPress }: { cat: CoinCategory | null; active: boolean; onPress: () => void }) {
   return (
@@ -62,13 +65,55 @@ function CoinList({ title, hint, coins, picked, onPick }: { title: string; hint:
   );
 }
 
-export function SwapCard({ s, good }: { s: Swap; good: boolean }) {
-  const c = good ? colors.positive : s.profit >= 0 ? colors.textMuted : colors.negative;
+/** − [ value ] + control for a percentage. */
+function PctInput({ value, min, max, onCommit }: { value: number; min: number; max: number; onCommit: (v: number) => void }) {
+  const [txt, setTxt] = useState(String(value));
+  useEffect(() => setTxt(String(value)), [value]);
+  const commit = (raw: string) => {
+    const n = parseFloat(raw.replace(",", "."));
+    const v = Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n * 10) / 10)) : value;
+    onCommit(v);
+    setTxt(String(v));
+  };
+  const step = (d: number) => commit(String(Math.round((value + d) * 10) / 10));
   return (
-    <View style={[styles.card, good && { borderColor: colors.positive }]}>
-      <Text style={[styles.profit, { color: c }]}>
-        {s.profit > 0 ? "+" : ""}{fmtInt(s.profit)} Toman · {s.pct > 0 ? "+" : ""}{s.pct.toFixed(2)}%
-      </Text>
+    <View style={styles.thrRow}>
+      <TouchableOpacity style={styles.stepBtn} onPress={() => step(-0.5)}><Text style={styles.stepTxt}>−</Text></TouchableOpacity>
+      <TextInput style={styles.thrInput} value={txt} onChangeText={setTxt} onEndEditing={(e) => commit(e.nativeEvent.text)} keyboardType="decimal-pad" selectTextOnFocus />
+      <Text style={styles.pct}>%</Text>
+      <TouchableOpacity style={styles.stepBtn} onPress={() => step(0.5)}><Text style={styles.stepTxt}>+</Text></TouchableOpacity>
+    </View>
+  );
+}
+
+const DIR_STYLE: Record<SwapDirection, { text: string; color: string }> = {
+  up: { text: "▲ UP", color: colors.positive },
+  down: { text: "▼ DOWN", color: "#f5a524" },
+  same: { text: "↔ SAME SIZE", color: colors.textMuted },
+};
+
+const TONE_COLOR = { green: colors.positive, red: colors.negative, grey: colors.textMuted } as const;
+
+function TrendMark({ t }: { t: SwapTrend | null }) {
+  if (!t) return <Text style={{ color: colors.textMuted }}>–</Text>;
+  if (t.dir === 0) return <Text style={{ color: colors.textMuted }}>▬</Text>;
+  return t.dir > 0 ? <Text style={{ color: colors.positive }}>▲</Text> : <Text style={{ color: colors.negative }}>▼</Text>;
+}
+
+/** Green = gain of 0.5% or more, red = loss of 0.5% or more, grey = in between. */
+export function SwapCard({ s, trend }: { s: Swap; trend: SwapTrend | null }) {
+  const tone = TONE_COLOR[swapTone(s.pct)];
+  const d = DIR_STYLE[s.dir];
+  return (
+    <View style={[styles.card, { borderColor: tone }]}>
+      <View style={styles.cardHead}>
+        <Text style={[styles.profit, { color: tone, flex: 1 }]}>
+          {signed(s.profit)} Toman · {signedPct(s.pct)} (<TrendMark t={trend} />)
+        </Text>
+        <View style={[styles.dirTag, { borderColor: d.color }]}>
+          <Text style={[styles.dirTagText, { color: d.color }]}>{d.text}</Text>
+        </View>
+      </View>
       <Text style={styles.legTag}>SELL {s.sellCount}×</Text>
       <Text style={styles.legName}>{s.sellTitle}</Text>
       <Text style={styles.legPrice}>{fmtInt(s.sellUnit)} each = {fmtInt(s.proceeds)}</Text>
@@ -86,17 +131,22 @@ export default function SwapPanel({
   update,
   coins,
   swaps,
+  history,
+  side,
 }: {
   visible: boolean;
   onClose: () => void;
   settings: ArbSettings;
   update: (p: Partial<ArbSettings>) => void;
   coins: SwapItem[];
-  swaps: Swap[]; // every have x want option, best first
+  swaps: Swap[]; // every have x want option (type filter applied), best first
+  history: PriceSample[]; // saved coin prices, for the 2 h trend
+  side: Side; // the panel opens from the side the tab sits on
 }) {
-  const x = useRef(new Animated.Value(PANEL_W)).current;
-  const [thr, setThr] = useState(String(settings.thresholdPct));
+  const from = side === "right" ? PANEL_W : -PANEL_W;
+  const x = useRef(new Animated.Value(from)).current;
   const [picking, setPicking] = useState<{ i: number; slot: 0 | 1 } | null>(null);
+  const [mode, setMode] = useState<"up" | "down">("up");
 
   const setPairs = (pairs: CategoryPair[]) => update({ pairs: pairs.length ? pairs : [[null, null]] });
   const choose = (cat: CoinCategory) => {
@@ -109,25 +159,15 @@ export default function SwapPanel({
     setPicking(null);
     setPairs(settings.pairs.filter((_, k) => k !== i));
   };
-  const filterOn = settings.pairs.some((p) => p[0] && p[1]);
 
   useEffect(() => {
     if (visible) {
-      x.setValue(PANEL_W);
+      x.setValue(from);
       Animated.timing(x, { toValue: 0, duration: 220, useNativeDriver: true }).start();
     }
-  }, [visible, x]);
-  useEffect(() => setThr(String(settings.thresholdPct)), [settings.thresholdPct]);
+  }, [visible, x, from]);
 
-  const close = () => Animated.timing(x, { toValue: PANEL_W, duration: 180, useNativeDriver: true }).start(() => onClose());
-
-  const commitThr = (raw: string) => {
-    const n = parseFloat(raw.replace(",", "."));
-    const v = Number.isFinite(n) ? Math.min(100, Math.max(0.1, n)) : settings.thresholdPct;
-    update({ thresholdPct: v });
-    setThr(String(v));
-  };
-  const step = (d: number) => commitThr(String(Math.round((settings.thresholdPct + d) * 10) / 10));
+  const close = () => Animated.timing(x, { toValue: from, duration: 180, useNativeDriver: true }).start(() => onClose());
 
   const toggleAlerts = async (on: boolean) => {
     if (on) {
@@ -137,25 +177,29 @@ export default function SwapPanel({
         return;
       }
       update({ enabled: true });
-      await syncBackgroundCheck(true);
       sendTestNotification().catch(() => {});
     } else {
       update({ enabled: false });
-      await syncBackgroundCheck(false);
     }
   };
 
-  const hits = swaps.filter((s) => s.pct >= settings.thresholdPct);
-  const nearMiss = swaps.filter((s) => s.pct < settings.thresholdPct).slice(0, 3);
+  const trendOf = (sw: Swap) => swapTrend(sw, history, Date.now());
+  const split = useMemo(() => splitSwaps(swaps, { minProfitPct: settings.thresholdPct, maxLossPct: settings.maxLossPct }), [swaps, settings.thresholdPct, settings.maxLossPct]);
   const ready = settings.have.length > 0 && settings.want.length > 0;
+
+  const isUp = mode === "up";
+  const shown = isUp ? split.up : split.down;
+  const closest = swaps.filter((s) => (isUp ? s.dir !== "down" : s.dir === "down") && !shown.includes(s)).slice(0, 3);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { flexDirection: side === "right" ? "row" : "row-reverse" }]}>
         <TouchableWithoutFeedback onPress={close}>
           <View style={styles.backdrop} />
         </TouchableWithoutFeedback>
-        <Animated.View style={[styles.panel, { width: PANEL_W, transform: [{ translateX: x }] }]}>
+        <Animated.View
+          style={[styles.panel, { width: PANEL_W, transform: [{ translateX: x }] }, side === "right" ? { borderLeftWidth: 1 } : { borderRightWidth: 1 }]}
+        >
           <View style={styles.head}>
             <Text style={styles.title}>Coin swaps</Text>
             <TouchableOpacity onPress={close} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -164,49 +208,19 @@ export default function SwapPanel({
           </View>
           <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
             <Text style={styles.intro}>
-              Sell one kind of coin and buy another with the same amount of gold. If the prices don't line up, you keep the difference in Toman.
+              Sell one kind of coin and buy another with the same amount of gold. If the prices don't line up, the difference is your profit (or loss).
             </Text>
 
             <View style={styles.rowBetween}>
               <View style={{ flex: 1, paddingRight: 10 }}>
                 <Text style={styles.h2}>Notify me</Text>
-                <Text style={styles.hint}>Checks with every price refresh, and about every 15 min in the background (Iran business hours).</Text>
+                <Text style={styles.hint}>Checked on every price refresh: about every 30 min in Iran business hours, also when the app is closed.</Text>
               </View>
               <Switch value={settings.enabled} onValueChange={toggleAlerts} trackColor={{ true: colors.primary, false: colors.border }} thumbColor={colors.white} />
             </View>
 
-            <View style={styles.block}>
-              <Text style={styles.h2}>Minimum profit</Text>
-              <Text style={styles.hint}>Share of the money you receive. Smaller swaps are ignored.</Text>
-              <View style={styles.thrRow}>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => step(-0.5)}><Text style={styles.stepTxt}>−</Text></TouchableOpacity>
-                <TextInput
-                  style={styles.thrInput}
-                  value={thr}
-                  onChangeText={setThr}
-                  onEndEditing={(e) => commitThr(e.nativeEvent.text)}
-                  keyboardType="decimal-pad"
-                  selectTextOnFocus
-                />
-                <Text style={styles.pct}>%</Text>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => step(0.5)}><Text style={styles.stepTxt}>+</Text></TouchableOpacity>
-              </View>
-            </View>
-
-            <CoinList
-              title="Coins I have"
-              hint="Ones I'm willing to sell."
-              coins={coins}
-              picked={settings.have}
-              onPick={(id) => update({ have: toggle(settings.have, id) })}
-            />
-            <CoinList
-              title="Coins I'd buy"
-              hint="Ones I'm willing to hold instead."
-              coins={coins}
-              picked={settings.want}
-              onPick={(id) => update({ want: toggle(settings.want, id) })}
-            />
+            <CoinList title="Coins I have" hint="Ones I'm willing to sell." coins={coins} picked={settings.have} onPick={(id) => update({ have: toggle(settings.have, id) })} />
+            <CoinList title="Coins I'd buy" hint="Ones I'm willing to hold instead." coins={coins} picked={settings.want} onPick={(id) => update({ want: toggle(settings.want, id) })} />
 
             <View style={styles.block}>
               <Text style={styles.h2}>Swap types</Text>
@@ -248,21 +262,56 @@ export default function SwapPanel({
               </TouchableOpacity>
             </View>
 
+            {/* upward / downward */}
+            <View style={styles.segRow}>
+              <TouchableOpacity style={[styles.seg, isUp && styles.segOn]} onPress={() => setMode("up")} activeOpacity={0.7}>
+                <Text style={[styles.segText, isUp && { color: colors.text }]}>▲ Upward ({split.up.length})</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.seg, !isUp && styles.segOn]} onPress={() => setMode("down")} activeOpacity={0.7}>
+                <Text style={[styles.segText, !isUp && { color: colors.text }]}>▼ Downward ({split.down.length})</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.block, { marginTop: 14 }]}>
+              <Text style={styles.h2}>{isUp ? "Minimum profit" : "Maximum loss"}</Text>
+              <Text style={styles.hint}>
+                {isUp
+                  ? "Sell smaller coins to buy a bigger one (also same-size swaps). Only swaps that earn at least this much, as a share of the money you receive."
+                  : "Sell a bigger coin to buy smaller ones. Shows swaps that lose at most this much (a swap that earns something always shows)."}
+              </Text>
+              {isUp ? (
+                <PctInput value={settings.thresholdPct} min={0.1} max={100} onCommit={(v) => update({ thresholdPct: v })} />
+              ) : (
+                <PctInput value={settings.maxLossPct} min={0} max={50} onCommit={(v) => update({ maxLossPct: v })} />
+              )}
+              <View style={[styles.rowBetween, { marginTop: 12, marginBottom: 0 }]}>
+                <Text style={[styles.hint, { flex: 1, marginTop: 0 }]}>Notify me about {isUp ? "upward" : "downward"} swaps</Text>
+                <Switch
+                  value={isUp ? settings.notifyUp : settings.notifyDown}
+                  onValueChange={(v) => update(isUp ? { notifyUp: v } : { notifyDown: v })}
+                  trackColor={{ true: colors.primary, false: colors.border }}
+                  thumbColor={colors.white}
+                />
+              </View>
+            </View>
+
             <View style={styles.block}>
-              <Text style={styles.h2}>Right now{filterOn ? " (filtered)" : ""}</Text>
+              <Text style={styles.h2}>{isUp ? "Upward options" : "Downward options"}</Text>
               {!ready ? (
                 <Text style={styles.hint}>Pick at least one coin you have and one you'd buy.</Text>
-              ) : hits.length ? (
-                hits.map((s) => <SwapCard key={s.key} s={s} good />)
+              ) : shown.length ? (
+                shown.map((x) => <SwapCard key={x.key} s={x} trend={trendOf(x)} />)
               ) : (
                 <>
-                  <Text style={styles.hint}>Nothing above {settings.thresholdPct}% at the moment.</Text>
-                  {nearMiss.length ? <Text style={[styles.hint, { marginTop: 8 }]}>Closest options:</Text> : null}
-                  {nearMiss.map((s) => <SwapCard key={s.key} s={s} good={false} />)}
+                  <Text style={styles.hint}>
+                    {isUp ? `Nothing earns ${settings.thresholdPct}% or more right now.` : `Nothing loses ${settings.maxLossPct}% or less right now.`}
+                  </Text>
+                  {closest.length ? <Text style={[styles.hint, { marginTop: 8 }]}>Closest options:</Text> : null}
+                  {closest.map((x) => <SwapCard key={x.key} s={x} trend={trendOf(x)} />)}
                 </>
               )}
               <Text style={styles.foot}>
-                Prices: you receive the site's "Buy" price when you sell, and pay its "Sell" price when you buy, so the spread is already counted. Coins with no whole-number match in gold weight (e.g. the 1 g coin) are skipped.
+                Card colour: green = gain of 0.5% or more, red = loss of 0.5% or more, grey = in between. The arrow in brackets compares this swap with about 2 hours ago (– means no saved price from around then yet). Prices: you receive the site's "Buy" price when you sell, and pay its "Sell" price when you buy, so the spread is already counted. Coins with no whole-number match in gold weight (e.g. the 1 g coin) are skipped.
               </Text>
             </View>
           </ScrollView>
@@ -273,9 +322,9 @@ export default function SwapPanel({
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, flexDirection: "row", backgroundColor: "rgba(0,0,0,0.55)" },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
   backdrop: { flex: 1 },
-  panel: { backgroundColor: colors.background, borderLeftWidth: 1, borderLeftColor: colors.border, paddingTop: 44, paddingHorizontal: 16 },
+  panel: { backgroundColor: colors.background, borderColor: colors.border, paddingTop: 44, paddingHorizontal: 16 },
   head: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   title: { color: colors.text, fontSize: 20, fontWeight: "700" },
   close: { color: colors.textMuted, fontSize: 20 },
@@ -313,8 +362,16 @@ const styles = StyleSheet.create({
   warnTxt: { color: colors.negative, fontSize: 11, marginTop: 6 },
   addPair: { marginTop: 10, alignItems: "center", paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
   addPairText: { color: colors.textMuted, fontSize: 13, fontWeight: "600" },
+  segRow: { flexDirection: "row", marginTop: 4 },
+  seg: { flex: 1, paddingVertical: 10, alignItems: "center", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginRight: -1 },
+  segOn: { backgroundColor: colors.primaryMuted, borderColor: colors.primary, zIndex: 1 },
+  segText: { color: colors.textMuted, fontSize: 13, fontWeight: "700" },
+  groupHead: { fontSize: 12, fontWeight: "700", marginTop: 12 },
+  cardHead: { flexDirection: "row", alignItems: "flex-start", marginBottom: 6 },
+  dirTag: { borderWidth: 1, borderRadius: 6, paddingVertical: 2, paddingHorizontal: 7, marginLeft: 8 },
+  dirTagText: { fontSize: 11, fontWeight: "700" },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginTop: 8 },
-  profit: { fontSize: 14, fontWeight: "700", marginBottom: 6 },
+  profit: { fontSize: 14, fontWeight: "700" },
   legTag: { color: colors.textMuted, fontSize: 11, fontWeight: "700", marginTop: 6 },
   legName: { color: colors.text, fontSize: 14, fontWeight: "600", textAlign: "right", writingDirection: "rtl" },
   legPrice: { color: colors.textMuted, fontSize: 12, textAlign: "right" },
