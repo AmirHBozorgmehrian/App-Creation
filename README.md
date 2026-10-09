@@ -1,4 +1,4 @@
-# TSE Stock App
+# Capstone
 
 Android app (Expo / React Native) with Stock, Gold, Currencies (placeholder)
 and Crypto (placeholder). **The phone fetches all data itself** - GitHub is

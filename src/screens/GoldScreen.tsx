@@ -4,10 +4,10 @@ import { colors } from "../theme";
 import MggBanner from "../components/MggBanner";
 import { useGold } from "../gold/GoldContext";
 import { GoldItem, formatJalaliIso } from "../../shared/gold";
-import { arrow, fmtInt, fmtPct, timeAgo, trendColor } from "../utils/format";
+import { arrow, fmtInt, fmtPct, trendColor } from "../utils/format";
 
 export default function GoldScreen({ onOpenItem, onBack }: { onOpenItem: (item: GoldItem, section: string) => void; onBack: () => void }) {
-  const { snapshot, loading, refreshing, syncing, refresh, error, source, lastFetchAt } = useGold();
+  const { snapshot, loading, refreshing, syncing, refresh, error, source } = useGold();
   const sections = (snapshot?.sections ?? []).map((s) => ({ title: s.title, data: s.items }));
 
   const header = (
@@ -19,7 +19,6 @@ export default function GoldScreen({ onOpenItem, onBack }: { onOpenItem: (item: 
       {error ? <Text style={styles.warn}>Couldn't refresh: {error}</Text> : null}
       <Text style={styles.meta}>
         Prices in Toman
-        {lastFetchAt ? ` · updated ${timeAgo(lastFetchAt)}` : ""}
         {snapshot?.sarafi.priceTime ? ` · site prices ${formatJalaliIso(snapshot.sarafi.priceTime)}` : ""}{source === "cache" ? " · saved copy" : ""}
       </Text>
     </View>
@@ -101,8 +100,8 @@ const styles = StyleSheet.create({
   price: { color: colors.text, fontSize: 13, fontWeight: "700" },
   priceBuy: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   tag: { color: colors.textMuted, fontWeight: "400", fontSize: 11 },
-  trendBox: { width: 58, alignItems: "flex-start" },
-  divider: { width: 1, alignSelf: "stretch", backgroundColor: colors.border, opacity: 0.6, marginHorizontal: 10 },
+  trendBox: { width: 48, alignItems: "flex-start" },
+  divider: { width: 1, alignSelf: "stretch", backgroundColor: colors.border, opacity: 0.6, marginHorizontal: 8 },
   trend: { fontSize: 13, fontWeight: "700" },
   trendPct: { fontSize: 12, fontWeight: "700", marginTop: 1 },
 });

@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from "react-native";
 import { Stock } from "../types";
 import { fetchLatestStocks } from "../api/snapshot";
@@ -118,7 +119,10 @@ export default function StockListScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.header}>TSE Stock App</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Image source={require("../../assets/stock-logo.png")} style={styles.logo} />
+          <Text style={styles.header}>Stock</Text>
+        </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           {syncing && <ActivityIndicator size="small" color={colors.textMuted} />}
         </View>
@@ -253,6 +257,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 50, paddingHorizontal: 16 },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   header: { fontSize: 22, fontWeight: "700", color: colors.text },
+  logo: { width: 30, height: 30, borderRadius: 15 },
   updatedText: { fontSize: 12, color: colors.textMuted, marginTop: 2, marginBottom: 10 },
   tabRow: { flexDirection: "row", marginBottom: 12, gap: 8 },
   tabButton: {

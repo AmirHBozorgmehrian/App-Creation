@@ -1,15 +1,17 @@
 {
   "expo": {
-    "name": "TSE Stock App",
+    "name": "Capstone",
     "slug": "tse-stock-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "splash": {
       "image": "./assets/splash-icon.png",
-      "backgroundColor": "#0e1320",
+      "backgroundColor": "#020a1c",
       "resizeMode": "contain"
     },
     "android": {
@@ -17,9 +19,9 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon-foreground.png",
-        "backgroundColor": "#2b2f38"
+        "backgroundColor": "#020a1c"
       },
-      "navigationBarColor": "#0e1320"
+      "navigationBarColor": "#020a1c"
     }
   }
 }

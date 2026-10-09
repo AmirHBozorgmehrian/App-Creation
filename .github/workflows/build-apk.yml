@@ -48,5 +48,5 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tse-stock-app-release-apk
+          name: capstone-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
