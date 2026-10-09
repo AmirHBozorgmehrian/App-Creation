@@ -49,6 +49,7 @@ export interface DayPoint { ymd: number; buy: number | null; sell: number | null
 export interface DayRef { v: number; ymd: number }
 
 export const USD_ITEM_ID: number;
+export const TOMAN_TO_RIAL: number;
 export const MG_PER_TROY_OUNCE: number;
 export const REFRESH_EVERY_MS: number;
 export function isIranBusinessTime(date: Date | number): boolean;

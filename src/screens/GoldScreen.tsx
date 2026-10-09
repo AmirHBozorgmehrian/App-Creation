@@ -54,15 +54,16 @@ export default function GoldScreen({ onOpenItem, onBack }: { onOpenItem: (item: 
             const pct = item.change?.pct ?? null;
             return (
               <TouchableOpacity style={styles.row} activeOpacity={0.7} onPress={() => onOpenItem(item, section.title)}>
-                <Text style={styles.name} numberOfLines={2}>{item.title}</Text>
-                <View style={styles.prices}>
-                  <Text style={styles.price}><Text style={styles.tag}>Sell </Text>{fmtInt(item.sell)}</Text>
-                  <Text style={styles.priceBuy}><Text style={styles.tag}>Buy </Text>{fmtInt(item.buy)}</Text>
-                </View>
                 <View style={styles.trendBox}>
                   <Text style={[styles.trend, { color: trendColor(pct) }]}>{arrow(pct)}</Text>
                   <Text style={[styles.trendPct, { color: trendColor(pct) }]}>{fmtPct(pct)}</Text>
                 </View>
+                <View style={styles.divider} />
+                <View style={styles.prices}>
+                  <Text style={styles.price}><Text style={styles.tag}>Sell </Text>{fmtInt(item.sell)}</Text>
+                  <Text style={styles.priceBuy}><Text style={styles.tag}>Buy </Text>{fmtInt(item.buy)}</Text>
+                </View>
+                <Text style={styles.name} numberOfLines={2}>{item.title}</Text>
               </TouchableOpacity>
             );
           }}
@@ -95,12 +96,13 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
-  name: { flex: 1, color: colors.text, fontSize: 14, fontWeight: "600", marginRight: 8 },
-  prices: { alignItems: "flex-end", marginRight: 10 },
+  name: { flex: 1, color: colors.text, fontSize: 14, fontWeight: "600", textAlign: "right", writingDirection: "rtl", marginLeft: 10 },
+  prices: { alignItems: "flex-end" },
   price: { color: colors.text, fontSize: 13, fontWeight: "700" },
   priceBuy: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   tag: { color: colors.textMuted, fontWeight: "400", fontSize: 11 },
-  trendBox: { width: 58, alignItems: "flex-end" },
+  trendBox: { width: 58, alignItems: "flex-start" },
+  divider: { width: 1, alignSelf: "stretch", backgroundColor: colors.border, opacity: 0.6, marginHorizontal: 10 },
   trend: { fontSize: 13, fontWeight: "700" },
   trendPct: { fontSize: 12, fontWeight: "700", marginTop: 1 },
 });
