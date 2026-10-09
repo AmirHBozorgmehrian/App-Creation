@@ -19,6 +19,8 @@ used only to build the .apk (`.github/workflows/build-apk.yml`).
 
 ## Coin swaps (Gold page -> "Swaps")
 
+The panel opens from the arrow tab on the right edge of the Gold page.
+
 Side panel for the "sell one coin, buy another of equal gold weight, keep the
 difference" trade (e.g. 1 full coin <-> 2 half coins, 2 half <-> 4 quarter,
 before/after 86, Bahar Azadi, ...).
@@ -30,6 +32,7 @@ before/after 86, Bahar Azadi, ...).
   every 15 min in Iranian business hours (Android decides the exact timing, and
   battery saver can delay it). The same swap is repeated at most every 3 h
   unless it improves by 1 point.
+- **Swap types**: optional cards with two spots (تمام ۸۶ / بهار آزادی / قبل ۸۶ / سکه یک گرمی) joined by ⇄. Only swaps between the chosen groups, in either direction, are shown and notified (e.g. بهار آزادی ⇄ بهار آزادی, or بهار آزادی ⇄ قبل ۸۶). Add several cards to allow several types; empty cards mean no restriction. It works together with the coin checklists.
 - Prices: you receive the site's "Buy" price when selling and pay its "Sell"
   price when buying, so the spread is already counted.
 - Only the bank-coin box is used. Weights live in `COIN_GRAMS` and the title

@@ -14,7 +14,7 @@ import {
   View,
 } from "react-native";
 import { colors } from "../theme";
-import { Swap, SwapItem } from "../../shared/gold";
+import { CategoryPair, CoinCategory, Swap, SwapItem } from "../../shared/gold";
 import { ArbSettings } from "../arbitrage/settings";
 import { ensurePermission, sendTestNotification } from "../arbitrage/notify";
 import { syncBackgroundCheck } from "../arbitrage/backgroundTask";
@@ -22,6 +22,22 @@ import { fmtInt } from "../utils/format";
 
 const W = Dimensions.get("window").width;
 const PANEL_W = Math.min(W * 0.92, 460);
+
+const CATEGORIES: { id: CoinCategory; label: string }[] = [
+  { id: "emami86", label: "تمام ۸۶" },
+  { id: "bahar", label: "بهار آزادی" },
+  { id: "pre86", label: "قبل ۸۶" },
+  { id: "gram", label: "سکه یک گرمی" },
+];
+const labelOf = (c: CoinCategory | null) => CATEGORIES.find((x) => x.id === c)?.label ?? "";
+
+function Slot({ cat, active, onPress }: { cat: CoinCategory | null; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={[styles.slot, cat ? styles.slotFilled : styles.slotEmpty, active && styles.slotActive]} onPress={onPress} activeOpacity={0.7}>
+      <Text style={cat ? styles.slotText : styles.slotPlaceholder} numberOfLines={1}>{cat ? labelOf(cat) : "Choose"}</Text>
+    </TouchableOpacity>
+  );
+}
 
 function toggle(list: string[], id: string): string[] {
   return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
@@ -80,6 +96,20 @@ export default function SwapPanel({
 }) {
   const x = useRef(new Animated.Value(PANEL_W)).current;
   const [thr, setThr] = useState(String(settings.thresholdPct));
+  const [picking, setPicking] = useState<{ i: number; slot: 0 | 1 } | null>(null);
+
+  const setPairs = (pairs: CategoryPair[]) => update({ pairs: pairs.length ? pairs : [[null, null]] });
+  const choose = (cat: CoinCategory) => {
+    if (!picking) return;
+    const cur = settings.pairs[picking.i][picking.slot];
+    setPairs(settings.pairs.map((p, i) => (i === picking.i ? (picking.slot === 0 ? [cur === cat ? null : cat, p[1]] : [p[0], cur === cat ? null : cat]) : p) as CategoryPair));
+    setPicking(null);
+  };
+  const removePair = (i: number) => {
+    setPicking(null);
+    setPairs(settings.pairs.filter((_, k) => k !== i));
+  };
+  const filterOn = settings.pairs.some((p) => p[0] && p[1]);
 
   useEffect(() => {
     if (visible) {
@@ -179,7 +209,47 @@ export default function SwapPanel({
             />
 
             <View style={styles.block}>
-              <Text style={styles.h2}>Right now</Text>
+              <Text style={styles.h2}>Swap types</Text>
+              <Text style={styles.hint}>
+                Only allow swaps between these groups (works both ways). Fill both spots of a card. Leave it empty to allow everything.
+              </Text>
+              {settings.pairs.map((p, i) => {
+                const open = picking?.i === i;
+                return (
+                  <View key={i} style={styles.pairCard}>
+                    <View style={styles.pairRow}>
+                      <Slot cat={p[0]} active={open && picking!.slot === 0} onPress={() => setPicking(open && picking!.slot === 0 ? null : { i, slot: 0 })} />
+                      <Text style={styles.swapSym}>⇄</Text>
+                      <Slot cat={p[1]} active={open && picking!.slot === 1} onPress={() => setPicking(open && picking!.slot === 1 ? null : { i, slot: 1 })} />
+                      <TouchableOpacity onPress={() => removePair(i)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ marginLeft: 8 }}>
+                        <Text style={styles.pairX}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {open ? (
+                      <View style={styles.chipRow}>
+                        {CATEGORIES.map((c) => {
+                          const sel = p[picking!.slot] === c.id;
+                          return (
+                            <TouchableOpacity key={c.id} style={[styles.catChip, sel && styles.catChipOn]} onPress={() => choose(c.id)} activeOpacity={0.7}>
+                              <Text style={styles.catChipText}>{c.label}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+                    {(p[0] === "gram" || p[1] === "gram") && p[0] && p[1] ? (
+                      <Text style={styles.warnTxt}>The 1 g coin has no whole-number match in gold weight with the others, so this pair finds nothing.</Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+              <TouchableOpacity style={styles.addPair} onPress={() => setPairs([...settings.pairs, [null, null]])} activeOpacity={0.7}>
+                <Text style={styles.addPairText}>+ Add another swap type</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.block}>
+              <Text style={styles.h2}>Right now{filterOn ? " (filtered)" : ""}</Text>
               {!ready ? (
                 <Text style={styles.hint}>Pick at least one coin you have and one you'd buy.</Text>
               ) : hits.length ? (
@@ -226,6 +296,23 @@ const styles = StyleSheet.create({
   boxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   tick: { color: colors.white, fontSize: 13, fontWeight: "700", lineHeight: 15 },
   coinName: { flex: 1, color: colors.text, fontSize: 14, fontWeight: "600", textAlign: "right", writingDirection: "rtl" },
+  pairCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, marginTop: 8 },
+  pairRow: { flexDirection: "row", alignItems: "center" },
+  slot: { flex: 1, height: 46, borderRadius: 10, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
+  slotEmpty: { borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.textMuted },
+  slotFilled: { backgroundColor: colors.primaryMuted, borderWidth: 1, borderColor: colors.primary },
+  slotActive: { borderColor: colors.white },
+  slotText: { color: colors.text, fontSize: 14, fontWeight: "700", writingDirection: "rtl" },
+  slotPlaceholder: { color: colors.textMuted, fontSize: 13 },
+  swapSym: { color: colors.text, fontSize: 22, fontWeight: "700", marginHorizontal: 10 },
+  pairX: { color: colors.textMuted, fontSize: 16 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 10 },
+  catChip: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingVertical: 7, paddingHorizontal: 12, marginRight: 8, marginBottom: 8 },
+  catChipOn: { borderColor: colors.primary, backgroundColor: colors.primaryMuted },
+  catChipText: { color: colors.text, fontSize: 13, fontWeight: "600", writingDirection: "rtl" },
+  warnTxt: { color: colors.negative, fontSize: 11, marginTop: 6 },
+  addPair: { marginTop: 10, alignItems: "center", paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
+  addPairText: { color: colors.textMuted, fontSize: 13, fontWeight: "600" },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginTop: 8 },
   profit: { fontSize: 14, fontWeight: "700", marginBottom: 6 },
   legTag: { color: colors.textMuted, fontSize: 11, fontWeight: "700", marginTop: 6 },

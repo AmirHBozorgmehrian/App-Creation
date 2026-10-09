@@ -349,6 +349,25 @@ function coinSpec(title) {
   return { size: size, kind: kind, grams: COIN_GRAMS[size] };
 }
 
+// The four groups the user thinks in: emami86 | bahar | pre86 | gram (else null).
+function coinCategory(title) {
+  var spec = coinSpec(title);
+  if (!spec) return null;
+  if (spec.size === "gram") return "gram";
+  return spec.kind === "other" ? null : spec.kind;
+}
+
+// pairs: [[catA, catB], ...] - a swap is allowed when {category sold, category bought}
+// equals {catA, catB} in either direction. Unfinished pairs (a null) are ignored;
+// no finished pair at all = no restriction.
+function pairAllows(pairs, catSold, catBought) {
+  var done = (pairs || []).filter(function (p) { return p && p[0] && p[1]; });
+  if (!done.length) return true;
+  return done.some(function (p) {
+    return (p[0] === catSold && p[1] === catBought) || (p[1] === catSold && p[0] === catBought);
+  });
+}
+
 // Smallest whole-coin counts (a of one, b of the other, each <= 8) with equal gold.
 function swapCounts(gramsSold, gramsBought) {
   for (var a = 1; a <= 8; a++) {
@@ -375,6 +394,7 @@ function findSwaps(items, opts) {
       var H = byId[hid];
       var W = byId[wid];
       if (!H || !W) return;
+      if (!pairAllows(opts && opts.pairs, coinCategory(H.it.title), coinCategory(W.it.title))) return;
       var recv = H.it.buy; // dealer buys from you
       var pay = W.it.sell; // dealer sells to you
       if (recv === null || recv === undefined || pay === null || pay === undefined) return;
@@ -554,6 +574,7 @@ module.exports = {
   COIN_CATEGORY_ID: COIN_CATEGORY_ID,
   COIN_GRAMS: COIN_GRAMS,
   coinSpec: coinSpec,
+  coinCategory: coinCategory,
   findSwaps: findSwaps,
   fetchOunceCloseRatio: fetchOunceCloseRatio,
   computeMgg: computeMgg,

@@ -92,4 +92,7 @@ export const COIN_CATEGORY_ID: number;
 export const COIN_GRAMS: Record<string, number>;
 export const CATEGORIES: Record<number, { title: string; gold: boolean; order: number }>;
 export function coinSpec(title: string): { size: string; kind: string; grams: number } | null;
-export function findSwaps(items: SwapItem[], opts: { have: string[]; want: string[] }): Swap[];
+export type CoinCategory = "emami86" | "bahar" | "pre86" | "gram";
+export type CategoryPair = [CoinCategory | null, CoinCategory | null];
+export function coinCategory(title: string): CoinCategory | null;
+export function findSwaps(items: SwapItem[], opts: { have: string[]; want: string[]; pairs?: CategoryPair[] }): Swap[];

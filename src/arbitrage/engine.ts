@@ -35,7 +35,7 @@ export async function checkAndNotify(items: SwapItem[], settings?: ArbSettings):
   const s = settings ?? (await loadSettings());
   if (!s.enabled || !s.have.length || !s.want.length) return [];
 
-  const hits = findSwaps(items, { have: s.have, want: s.want }).filter((x) => x.pct >= s.thresholdPct);
+  const hits = findSwaps(items, { have: s.have, want: s.want, pairs: s.pairs }).filter((x) => x.pct >= s.thresholdPct);
   const prev = await readNotified();
   const now = Date.now();
   const next: Notified = {};
