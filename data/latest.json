@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-18T14:27:29.607Z",
+  "updatedAt": "2026-11-18T14:58:45.402Z",
   "stocks": [
     {
       "insCode": "17617474823279712",
@@ -6547,6 +6547,17 @@
       "tradeVolume": 0
     },
     {
+      "insCode": "5051727550286539",
+      "symbol": "ثبات2",
+      "name": "صندوق س. ثبات ويستا -د",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
       "insCode": "68909035712962732",
       "symbol": "ثباغ",
       "name": "شهر سازي و خانه سازي باغميشه",
@@ -10133,6 +10144,17 @@
       "tradeVolume": 0
     },
     {
+      "insCode": "55835993914721095",
+      "symbol": "رايبد2",
+      "name": "صندوق س رايبد-ثابت",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
       "insCode": "66105959479616770",
       "symbol": "رايكا",
       "name": "صندوق س نوع دوم رايكا- ثابت",
@@ -13127,6 +13149,17 @@
     {
       "insCode": "7887331100268907",
       "symbol": "سيلوا",
+      "name": "صندوق س.كالاي پاداش1",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "52578796680038854",
+      "symbol": "سيلوا2",
       "name": "صندوق س.كالاي پاداش1",
       "lastPrice": 0,
       "closingPrice": 0,
@@ -41441,6 +41474,17 @@
     {
       "insCode": "1438514795814416",
       "symbol": "ياقوت",
+      "name": "صندوق س ياقوت آگاه-ثابت",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "29884261753438378",
+      "symbol": "ياقوت2",
       "name": "صندوق س ياقوت آگاه-ثابت",
       "lastPrice": 0,
       "closingPrice": 0,
