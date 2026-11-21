@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-21T13:39:14.175Z",
+  "updatedAt": "2026-11-21T14:03:42.206Z",
   "stocks": [
     {
       "insCode": "17617474823279712",
@@ -125,6 +125,17 @@
     {
       "insCode": "47492157735162813",
       "symbol": "آتيه ملت",
+      "name": "صندوق س آتيه ملت-ثابت",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "14055116314505439",
+      "symbol": "آتيه ملت4",
       "name": "صندوق س آتيه ملت-ثابت",
       "lastPrice": 0,
       "closingPrice": 0,
