@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-21T14:03:42.206Z",
+  "updatedAt": "2026-11-21T16:27:45.809Z",
   "stocks": [
     {
       "insCode": "17617474823279712",
@@ -510,6 +510,17 @@
     {
       "insCode": "490987973229371",
       "symbol": "آكام",
+      "name": "صندوق س. نوع دوم آكام-د",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "27849713918268133",
+      "symbol": "آكام2",
       "name": "صندوق س. نوع دوم آكام-د",
       "lastPrice": 0,
       "closingPrice": 0,
@@ -2290,6 +2301,17 @@
       "tradeVolume": 0
     },
     {
+      "insCode": "64701620739344512",
+      "symbol": "افران2",
+      "name": "صندوق س افرا نماد پايدار-ثابت",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
       "insCode": "49502666250908008",
       "symbol": "افق",
       "name": "فروشگاههاي زنجيره اي افق كوروش",
@@ -3018,6 +3040,17 @@
     {
       "insCode": "34856765062083074",
       "symbol": "بازده",
+      "name": "صندوق س. بازده ثابت-د",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "32182002841162942",
+      "symbol": "بازده2",
       "name": "صندوق س. بازده ثابت-د",
       "lastPrice": 0,
       "closingPrice": 0,
@@ -4305,6 +4338,17 @@
     {
       "insCode": "55070742656326885",
       "symbol": "پايا",
+      "name": "صندوق س.پايا قلك پويا-د",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "52806889703092757",
+      "symbol": "پايا2",
       "name": "صندوق س.پايا قلك پويا-د",
       "lastPrice": 0,
       "closingPrice": 0,
@@ -6153,6 +6197,17 @@
     {
       "insCode": "26780282166315918",
       "symbol": "ثبات",
+      "name": "صندوق س. ثبات ويستا -د",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "5051727550286539",
+      "symbol": "ثبات2",
       "name": "صندوق س. ثبات ويستا -د",
       "lastPrice": 0,
       "closingPrice": 0,
@@ -9792,6 +9847,17 @@
       "tradeVolume": 0
     },
     {
+      "insCode": "55835993914721095",
+      "symbol": "رايبد2",
+      "name": "صندوق س رايبد-ثابت",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
       "insCode": "66105959479616770",
       "symbol": "رايكا",
       "name": "صندوق س نوع دوم رايكا- ثابت",
@@ -9871,6 +9937,17 @@
     {
       "insCode": "20244389840999638",
       "symbol": "رز ترنج",
+      "name": "صندوق س.كالاي ترنج",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "52072275543206224",
+      "symbol": "رز ترنج2",
       "name": "صندوق س.كالاي ترنج",
       "lastPrice": 0,
       "closingPrice": 0,
@@ -14128,6 +14205,17 @@
     {
       "insCode": "45205530868811305",
       "symbol": "صايند",
+      "name": "صندوق س. گنجينه آينده روشن-د",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "45333947259496713",
+      "symbol": "صايند2",
       "name": "صندوق س. گنجينه آينده روشن-د",
       "lastPrice": 0,
       "closingPrice": 0,
@@ -34190,6 +34278,17 @@
       "tradeVolume": 0
     },
     {
+      "insCode": "17880257387458062",
+      "symbol": "كامياب2",
+      "name": "صندوق س. كامياب آشنا-د",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
       "insCode": "24653108506137885",
       "symbol": "كانسار",
       "name": "معدنكاران نسوز",
@@ -35369,6 +35468,17 @@
     {
       "insCode": "25559236668122210",
       "symbol": "كهربا",
+      "name": "صندوق س. كالاي كهربا",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "44215112373339904",
+      "symbol": "كهربا2",
       "name": "صندوق س. كالاي كهربا",
       "lastPrice": 0,
       "closingPrice": 0,
