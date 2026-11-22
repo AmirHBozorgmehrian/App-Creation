@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-22T13:31:42.346Z",
+  "updatedAt": "2026-11-22T13:56:44.567Z",
   "stocks": [
     {
       "insCode": "17617474823279712",
@@ -400,6 +400,17 @@
     {
       "insCode": "26393127587277568",
       "symbol": "آسا",
+      "name": "صندوق س آرمان كارآفرين-ثابت",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "53835366979083256",
+      "symbol": "آسا2",
       "name": "صندوق س آرمان كارآفرين-ثابت",
       "lastPrice": 0,
       "closingPrice": 0,
@@ -10465,6 +10476,17 @@
     {
       "insCode": "16817885126368964",
       "symbol": "زرگر",
+      "name": "صندوق س.كالاي كارآمد",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "57479363687216607",
+      "symbol": "زرگر2",
       "name": "صندوق س.كالاي كارآمد",
       "lastPrice": 0,
       "closingPrice": 0,
@@ -38141,6 +38163,17 @@
     {
       "insCode": "41941748231072053",
       "symbol": "نقرآمد",
+      "name": "صندوق س. كالاي كارآمد1",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "13193294469602561",
+      "symbol": "نقرآمد2",
       "name": "صندوق س. كالاي كارآمد1",
       "lastPrice": 0,
       "closingPrice": 0,
