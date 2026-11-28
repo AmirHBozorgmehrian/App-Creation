@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-28T14:26:45.892Z",
+  "updatedAt": "2026-11-28T14:56:58.020Z",
   "stocks": [
     {
       "insCode": "17617474823279712",
@@ -2006,6 +2006,17 @@
     {
       "insCode": "35163287528816137",
       "symbol": "اعتبار",
+      "name": "صندوق س. نوع دوم اعتبار-د",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "15519769256883158",
+      "symbol": "اعتبار2",
       "name": "صندوق س. نوع دوم اعتبار-د",
       "lastPrice": 0,
       "closingPrice": 0,
@@ -10653,6 +10664,17 @@
       "insCode": "57191287546444240",
       "symbol": "زمرد كوروش",
       "name": "صندوق س زمرد كوروش-ثابت",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "36416491029266571",
+      "symbol": "زمرد2",
+      "name": "صندوق س.كالاي زمرد بيدار",
       "lastPrice": 0,
       "closingPrice": 0,
       "priceChangePercent": null,
@@ -30397,6 +30419,17 @@
     {
       "insCode": "19060410060488876",
       "symbol": "طلوع",
+      "name": "صندوق س.طلوع نوين ثابت-د",
+      "lastPrice": 0,
+      "closingPrice": 0,
+      "priceChangePercent": null,
+      "dayMin": null,
+      "dayMax": null,
+      "tradeVolume": 0
+    },
+    {
+      "insCode": "66220730726109607",
+      "symbol": "طلوع2",
       "name": "صندوق س.طلوع نوين ثابت-د",
       "lastPrice": 0,
       "closingPrice": 0,
